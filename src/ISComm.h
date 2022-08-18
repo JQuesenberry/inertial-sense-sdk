@@ -82,6 +82,7 @@ typedef enum
 	_PTYPE_ASCII_NMEA           = 0xBFFFFFFF,				/** Protocol Type: ASCII NMEA (National Marine Electronics Association) */
 	_PTYPE_UBLOX                = 0xAFFFFFFF,				/** Protocol Type: uBlox binary */
 	_PTYPE_RTCM3                = 0x9FFFFFFF,				/** Protocol Type: RTCM3 binary (Radio Technical Commission for Maritime Services) */
+	_PTYPE_SONY                 = 0x8FFFFFFF,				/** Protocol Type: SONY binary */
 } protocol_type_t;
 
 /** uINS default baud rate */
@@ -294,7 +295,10 @@ enum ePktSpecialChars
 	UBLOX_START_BYTE2 = 0x62,
 
 	/** Rtcm3 start byte (211) */
-	RTCM3_START_BYTE = 0xD3
+	RTCM3_START_BYTE = 0xD3,
+
+	/** Sony start byte (127) */
+	SONY_START_BYTE = 0x7F,
 };
 
 /** Represents an ASCII message and how it is mapped to a structure in memory */
@@ -480,6 +484,9 @@ typedef struct
 
 	/** Enable protocol parsing: RTCM3 */
 	uint8_t enableRTCM3;
+
+	/** Enable protocol parsing: SONY */
+	uint8_t enableSONY;
 } is_comm_config_t;
 
 /** An instance of an is_comm interface.  Do not modify these values. */

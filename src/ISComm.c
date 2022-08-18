@@ -224,6 +224,7 @@ void is_comm_init(is_comm_instance_t* instance, uint8_t *buffer, int bufferSize)
 	instance->config.enableASCII = 1;
 	instance->config.enableUblox = 1;
 	instance->config.enableRTCM3 = 1;
+	instance->config.enableSONY = 1;
 	
 	instance->txPktCount = 0;
 	instance->rxErrorCount = 0;
@@ -496,6 +497,68 @@ static protocol_type_t processRtcm3Byte(is_comm_instance_t* instance)
 	return _PTYPE_NONE;
 }
 
+static protocol_type_t processSonyByte(is_comm_instance_t* instance)
+{
+	switch (instance->parseState)
+	{
+	case 0:	// SYNC (special char)
+	case 1:	// length byte 1
+		instance->parseState++;
+		break;
+	case 2: // length byte 2
+		{
+			uint16_t len = *((uint16_t*)(instance->buf.scan - 2));
+
+			// if length is greater than available buffer, we cannot parse this ublox packet - sony header is 4 bytes, there are 2 checksum bytes also
+			if (len > instance->buf.size - 6)
+			{
+				instance->rxErrorCount++;
+				reset_parser(instance);
+				return _PTYPE_PARSE_ERROR;
+			}
+			instance->parseState = -((int32_t)len + 2 + len > 0 ? 1 : 0);	// Opcode plus checksums (last checksum only present if length > 0)
+		} 
+		break;
+	default:
+		if (++instance->parseState == 0)
+		{
+			// end of ublox packet, if checksum passes, send the external id
+			// instance->hasStartByte = 0;
+			// uint8_t checksum = *(instance->buf.scan - 2);
+			// uint8_t actualChecksum2 = *(instance->buf.scan - 1);
+			// uint8_t calcChecksum1 = 0;
+			// uint8_t calcChecksum2 = 0;
+
+			// // calculate checksum, skipping the first two preamble bytes and the last two bytes which are the checksum
+			// for (uint8_t* ptr = instance->buf.head + 2, *ptrEnd = instance->buf.scan - 2; ptr < ptrEnd; ptr++)
+			// {
+			// 	calcChecksum1 += *ptr;
+			// 	calcChecksum2 += calcChecksum1;
+			// }
+			// if (actualChecksum1 == calcChecksum1 && actualChecksum2 == calcChecksum2)
+			// {	// Checksum passed - Valid ublox packet
+			// 	// Update data pointer and info
+			// 	instance->dataPtr = instance->buf.head;
+			// 	instance->dataHdr.id = 0;
+			// 	instance->dataHdr.size = (uint32_t)(instance->buf.scan - instance->buf.head);
+			// 	instance->dataHdr.offset = 0;
+			// 	instance->pktPtr = instance->buf.head;
+			// 	reset_parser(instance);
+				return _PTYPE_SONY;
+			// }
+			// else
+			// {	// Checksum failure
+			// 	instance->rxErrorCount++;
+			// 	reset_parser(instance);
+			// 	return _PTYPE_PARSE_ERROR;
+			// }
+		}
+		break;
+	}
+
+	return _PTYPE_NONE;
+}
+
 int is_comm_free(is_comm_instance_t* instance)
 {
 // 	if (instance == 0 || instance->buf.start == 0)
@@ -564,7 +627,8 @@ protocol_type_t is_comm_parse(is_comm_instance_t* instance)
 			if ((byte == PSC_START_BYTE			&& instance->config.enableISB) ||
 				(byte == PSC_ASCII_START_BYTE	&& instance->config.enableASCII) ||
 				(byte == UBLOX_START_BYTE1		&& instance->config.enableUblox) ||
-				(byte == RTCM3_START_BYTE		&& instance->config.enableRTCM3) )
+				(byte == RTCM3_START_BYTE		&& instance->config.enableRTCM3) ||
+				(byte == SONY_START_BYTE 		&& instance->config.enableSONY))
 			{	// Found start byte.  Initialize states (set flag and reset pos to beginning)
 				instance->hasStartByte = byte; 
 				instance->buf.head = instance->buf.scan-1;
@@ -618,7 +682,15 @@ protocol_type_t is_comm_parse(is_comm_instance_t* instance)
 			{
 				return ptype;
 			}
-		}
+			break;
+		case SONY_START_BYTE:
+			ptype = processSonyByte(instance);
+			if (ptype != _PTYPE_NONE)
+			{
+				return ptype;
+			}
+			break;
+		}	
 	}
 
 	// No valid data yet...
