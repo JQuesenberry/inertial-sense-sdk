@@ -505,23 +505,23 @@ static protocol_type_t processSonyByte(is_comm_instance_t* instance)
 	case 1:	// length byte 1
 		instance->parseState++;
 		break;
-	case 2: // length byte 2
-		{
-			uint16_t len = *((uint16_t*)(instance->buf.scan - 2));
+	case 2: { // length byte 2 
+		uint16_t len = BE_SWAP16(*((uint16_t*)(instance->buf.scan - 2)));
 
-			// if length is greater than available buffer, we cannot parse this ublox packet - sony header is 4 bytes, there are 2 checksum bytes also
-			if (len > instance->buf.size - 6)
-			{
-				instance->rxErrorCount++;
-				reset_parser(instance);
-				return _PTYPE_PARSE_ERROR;
-			}
-			instance->parseState = -((int32_t)len + 2 + len > 0 ? 1 : 0);	// Opcode plus checksums (last checksum only present if length > 0)
-		} 
-		break;
+		// if length is greater than available buffer, we cannot parse this sony packet - sony header is 4 bytes, there are 2 checksum bytes also
+		if (len > instance->buf.size - 6)
+		{
+			instance->rxErrorCount++;
+			reset_parser(instance);
+			return _PTYPE_PARSE_ERROR;
+		}
+		instance->parseState = -((int32_t)len);	// Opcode plus checksums (last checksum only present if length > 0)
+		break; }
+
 	default:
 		if (++instance->parseState == 0)
 		{
+
 			// end of ublox packet, if checksum passes, send the external id
 			// instance->hasStartByte = 0;
 			// uint8_t checksum = *(instance->buf.scan - 2);
@@ -538,20 +538,22 @@ static protocol_type_t processSonyByte(is_comm_instance_t* instance)
 			// if (actualChecksum1 == calcChecksum1 && actualChecksum2 == calcChecksum2)
 			// {	// Checksum passed - Valid ublox packet
 			// 	// Update data pointer and info
-			// 	instance->dataPtr = instance->buf.head;
-			// 	instance->dataHdr.id = 0;
-			// 	instance->dataHdr.size = (uint32_t)(instance->buf.scan - instance->buf.head);
-			// 	instance->dataHdr.offset = 0;
-			// 	instance->pktPtr = instance->buf.head;
-			// 	reset_parser(instance);
+			if (*instance->buf.head == 0x7F)
+			{
+				instance->dataPtr = instance->buf.head;
+				instance->dataHdr.id = 0;
+				instance->dataHdr.size = (uint32_t)(instance->buf.scan - instance->buf.head);
+				instance->dataHdr.offset = 0;
+				instance->pktPtr = instance->buf.head;
+				reset_parser(instance);
 				return _PTYPE_SONY;
-			// }
-			// else
-			// {	// Checksum failure
-			// 	instance->rxErrorCount++;
-			// 	reset_parser(instance);
-			// 	return _PTYPE_PARSE_ERROR;
-			// }
+			}
+			else
+			{
+			 	instance->rxErrorCount++;
+			 	reset_parser(instance);
+			 	return _PTYPE_PARSE_ERROR;
+			}
 		}
 		break;
 	}
