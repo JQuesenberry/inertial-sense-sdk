@@ -502,11 +502,13 @@ static protocol_type_t processSonyByte(is_comm_instance_t* instance)
 	switch (instance->parseState)
 	{
 	case 0:	// SYNC (special char)
-	case 1:	// length byte 1
+	case 1:	// length byte low
+	case 2:	// length byte high
+	case 3:	// ID
 		instance->parseState++;
 		break;
-	case 2: { // length byte 2 
-		uint16_t len = BE_SWAP16(*((uint16_t*)(instance->buf.scan - 2)));
+	case 4: {	// Checksum 
+		uint16_t len = BE_SWAP16(*((uint16_t*)(instance->buf.scan - 4)));
 
 		// if length is greater than available buffer, we cannot parse this sony packet - sony header is 4 bytes, there are 2 checksum bytes also
 		if (len > instance->buf.size - 6)
@@ -515,29 +517,37 @@ static protocol_type_t processSonyByte(is_comm_instance_t* instance)
 			reset_parser(instance);
 			return _PTYPE_PARSE_ERROR;
 		}
-		instance->parseState = -((int32_t)len);	// Opcode plus checksums (last checksum only present if length > 0)
-		break; }
 
+		uint8_t low = *((uint8_t*)(instance->buf.scan - 4));
+		uint8_t high = *((uint8_t*)(instance->buf.scan - 3));
+		uint8_t id = *((uint8_t*)(instance->buf.scan - 2));
+		uint8_t read_checksum = *((uint8_t*)(instance->buf.scan - 1));
+		
+		uint8_t computed_checksum = low + high + id + 0x7F;
+
+		if (read_checksum != computed_checksum)
+		{
+			instance->rxErrorCount++;
+			reset_parser(instance);
+			return _PTYPE_PARSE_ERROR;
+		}
+
+		if (len != 0)
+		{
+			instance->parseState = -((int32_t)len + 1);	// Plus 1 checksum byte
+			break;
+		}
+		else
+		{
+			instance->parseState = -1;
+		}
+		}	// Fall through
 	default:
 		if (++instance->parseState == 0)
 		{
+			// end of packet, if checksum passes, send the external id
+			instance->hasStartByte = 0;
 
-			// end of ublox packet, if checksum passes, send the external id
-			// instance->hasStartByte = 0;
-			// uint8_t checksum = *(instance->buf.scan - 2);
-			// uint8_t actualChecksum2 = *(instance->buf.scan - 1);
-			// uint8_t calcChecksum1 = 0;
-			// uint8_t calcChecksum2 = 0;
-
-			// // calculate checksum, skipping the first two preamble bytes and the last two bytes which are the checksum
-			// for (uint8_t* ptr = instance->buf.head + 2, *ptrEnd = instance->buf.scan - 2; ptr < ptrEnd; ptr++)
-			// {
-			// 	calcChecksum1 += *ptr;
-			// 	calcChecksum2 += calcChecksum1;
-			// }
-			// if (actualChecksum1 == calcChecksum1 && actualChecksum2 == calcChecksum2)
-			// {	// Checksum passed - Valid ublox packet
-			// 	// Update data pointer and info
 			if (*instance->buf.head == 0x7F)
 			{
 				instance->dataPtr = instance->buf.head;

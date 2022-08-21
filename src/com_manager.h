@@ -248,6 +248,9 @@ typedef struct
 	// Message handler - RTCM3
 	pfnComManagerGenMsgHandler cmMsgHandlerRtcm3;
 
+	// Message handler - SONY
+	pfnComManagerGenMsgHandler cmMsgHandlerSony;
+
 } com_manager_t;
 
 
@@ -531,12 +534,14 @@ void comManagerSetCallbacks(
 	pfnComManagerAsapMsg rmcHandler,
 	pfnComManagerGenMsgHandler asciiHandler,
 	pfnComManagerGenMsgHandler ubloxHandler, 
-	pfnComManagerGenMsgHandler rtcm3Handler);
+	pfnComManagerGenMsgHandler rtcm3Handler,
+	pfnComManagerGenMsgHandler sonyHandler);
 void comManagerSetCallbacksInstance(CMHANDLE cmInstance, 
 	pfnComManagerAsapMsg rmcHandler,
 	pfnComManagerGenMsgHandler asciiHandler,
 	pfnComManagerGenMsgHandler ubloxHandler,
-	pfnComManagerGenMsgHandler rtcm3Handler);
+	pfnComManagerGenMsgHandler rtcm3Handler,
+	pfnComManagerGenMsgHandler sonyHandler);
 
 /**
 Attach user defined data to a com manager instance

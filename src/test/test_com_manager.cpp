@@ -266,7 +266,7 @@ bool initComManager(test_data_t &t)
 	comManagerRegisterInstance(&(t.cm), DID_DEV_INFO, prepDevInfo, 0, &(t.msgs.devInfo), 0, sizeof(dev_info_t), 0);
 	comManagerRegisterInstance(&(t.cm), DID_FLASH_CONFIG, 0, writeNvrUserpageFlashCfg, &t.msgs.nvmFlashCfg, 0, sizeof(nvm_flash_cfg_t), 0);
 
-	comManagerSetCallbacksInstance(&(t.cm), NULL, msgHandlerAscii, msgHandlerUblox, msgHandlerRtcm3);
+	comManagerSetCallbacksInstance(&(t.cm), NULL, msgHandlerAscii, msgHandlerUblox, msgHandlerRtcm3, msgHandlerSony);
 
 	// Enable/disable protocols
 	s_cmPort.comm.config.enableISB = TEST_PROTO_IS;

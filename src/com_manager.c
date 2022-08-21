@@ -373,6 +373,13 @@ void comManagerStepRxInstance(CMHANDLE cmInstance_)
 						error = (uint8_t)cmInstance->cmMsgHandlerAscii(cmInstance, pHandle, dataPtr, dataSize);
 					}
 					break;
+
+				case _PTYPE_SONY:
+					if (cmInstance->cmMsgHandlerSony)
+					{
+						error = (uint8_t)cmInstance->cmMsgHandlerSony(cmInstance, pHandle, dataPtr, dataSize);
+					}
+					break;
 					
 				default:
 					break;
@@ -454,16 +461,18 @@ void comManagerSetCallbacks(
 	pfnComManagerAsapMsg handlerRmc,
 	pfnComManagerGenMsgHandler handlerAscii,
 	pfnComManagerGenMsgHandler handlerUblox, 
-	pfnComManagerGenMsgHandler handlerRtcm3)
+	pfnComManagerGenMsgHandler handlerRtcm3,
+	pfnComManagerGenMsgHandler handlerSony)
 {
-	comManagerSetCallbacksInstance(&g_cm, handlerRmc, handlerAscii, handlerUblox, handlerRtcm3);
+	comManagerSetCallbacksInstance(&g_cm, handlerRmc, handlerAscii, handlerUblox, handlerRtcm3, handlerSony);
 }
 
 void comManagerSetCallbacksInstance(CMHANDLE cmInstance, 
 	pfnComManagerAsapMsg handlerRmc,
 	pfnComManagerGenMsgHandler handlerAscii,
 	pfnComManagerGenMsgHandler handlerUblox,
-	pfnComManagerGenMsgHandler handlerRtcm3)
+	pfnComManagerGenMsgHandler handlerRtcm3, 
+	pfnComManagerGenMsgHandler handlerSony)
 {
 	if (cmInstance != 0)
 	{
@@ -471,6 +480,7 @@ void comManagerSetCallbacksInstance(CMHANDLE cmInstance,
 		((com_manager_t*)cmInstance)->cmMsgHandlerAscii = handlerAscii;
 		((com_manager_t*)cmInstance)->cmMsgHandlerUblox = handlerUblox;
 		((com_manager_t*)cmInstance)->cmMsgHandlerRtcm3 = handlerRtcm3;
+		((com_manager_t*)cmInstance)->cmMsgHandlerSony = handlerSony;
 	}
 }
 
