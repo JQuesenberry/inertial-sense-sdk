@@ -522,6 +522,7 @@ class logPlot:
         self.configureSubplot(ax[2], 'CNO', 'dBHz')
         self.configureSubplot(ax[3], 'Status', '')
 
+        plot_legend = 1
         for d in self.active_devs:
             r = d == self.active_devs[0]  # plot text w/ first device
             time = getTimeFromTowMs(self.getData(d, did_gps_pos, 'timeOfWeekMs'))
@@ -536,7 +537,8 @@ class logPlot:
             if self.log.data[d, DID_GPS1_RTK_POS] is not []:
                 rtktime = getTimeFromTowMs(self.getData(d, DID_GPS1_RTK_POS, 'timeOfWeekMs'))
                 ax[1].plot(rtktime, self.getData(d, DID_GPS1_RTK_POS, 'vAcc'), 'g', label="rtkHor")
-            if d == 0:
+            if plot_legend:
+                plot_legend = 0
                 ax[1].legend(ncol=2)
             ax[2].plot(time, self.getData(d, did_gps_pos, 'cnoMean'))
 
@@ -1021,7 +1023,7 @@ class logPlot:
                         alable += '%d ' % n
                     else:
                         alable += ' '
-                    self.configureSubplot(ax[i, n], alable + axislable + ' ($m/s^2$), RW: %.3g $m/s/\sqrt{hr}$, BI: %.3g $m/s^2$/hr' % (np.mean(sumRW[i][n]) + np.std(sumRW[i][n]), np.mean(sumBI[i][n]) + np.std(sumBI[i][n])), 'sec')
+                    self.configureSubplot(ax[i, n], alable + axislable + ' ($m/s^2$), RW: %.3g $m/s/\sqrt{hr}$, BI: %.3g $m/s^2$' % (np.mean(sumRW[i][n]) + np.std(sumRW[i][n]), np.mean(sumBI[i][n]) + np.std(sumBI[i][n])), 'sec')
 
         for i in range(accCount):
             for d in range(3):
