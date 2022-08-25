@@ -499,6 +499,8 @@ static protocol_type_t processRtcm3Byte(is_comm_instance_t* instance)
 
 static protocol_type_t processSonyByte(is_comm_instance_t* instance)
 {
+	uint16_t len = 0xFFFF;
+
 	switch (instance->parseState)
 	{
 	case 0:	// SYNC (special char)
@@ -508,7 +510,7 @@ static protocol_type_t processSonyByte(is_comm_instance_t* instance)
 		instance->parseState++;
 		break;
 	case 4: {	// Checksum 
-		uint16_t len = BE_SWAP16(*((uint16_t*)(instance->buf.scan - 4)));
+		len = BE_SWAP16(*((uint16_t*)(instance->buf.scan - 4)));
 
 		// if length is greater than available buffer, we cannot parse this sony packet - sony header is 4 bytes, there are 2 checksum bytes also
 		if (len > instance->buf.size - 6)
@@ -518,10 +520,10 @@ static protocol_type_t processSonyByte(is_comm_instance_t* instance)
 			return _PTYPE_PARSE_ERROR;
 		}
 
-		uint8_t low = *((uint8_t*)(instance->buf.scan - 4));
-		uint8_t high = *((uint8_t*)(instance->buf.scan - 3));
-		uint8_t id = *((uint8_t*)(instance->buf.scan - 2));
-		uint8_t read_checksum = *((uint8_t*)(instance->buf.scan - 1));
+		uint8_t low = *(instance->buf.scan - 4);
+		uint8_t high = *(instance->buf.scan - 3);
+		uint8_t id = *(instance->buf.scan - 2);
+		uint8_t read_checksum = *(instance->buf.scan - 1);
 		
 		uint8_t computed_checksum = low + high + id + 0x7F;
 
@@ -548,7 +550,22 @@ static protocol_type_t processSonyByte(is_comm_instance_t* instance)
 			// end of packet, if checksum passes, send the external id
 			instance->hasStartByte = 0;
 
-			if (*instance->buf.head == 0x7F)
+			uint8_t computed_checksum_2 = 0;
+			uint8_t read_checksum_2 = 0;
+
+			// Len will be 0xFFFF unless packet payload length is 0
+			if(len == 0xFFFF)
+			{
+				// Skip the first 5 bytes (header + checksum) and go until the byte before checksum 2
+				for(int i = 5; i < (instance->buf.scan - instance->buf.head) - 1; i++)
+				{
+					computed_checksum_2 += *(instance->buf.head + i);
+				}
+
+				read_checksum_2 = *(instance->buf.scan - 1);
+			}
+
+			if(read_checksum_2 == computed_checksum_2)
 			{
 				instance->dataPtr = instance->buf.head;
 				instance->dataHdr.id = 0;
