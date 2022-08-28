@@ -24,6 +24,8 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 #include "ISBootloaderBase.h"
 #include "libusb.h"
 
+#include <mutex>
+
 namespace ISBootloader {
 
 static constexpr int IS_DFU_UID_MAX_SIZE = 20;
@@ -74,7 +76,7 @@ public:
     
     is_operation_result reboot();
     is_operation_result reboot_up();
-    is_operation_result reboot_down() { return IS_OP_OK; }
+    is_operation_result reboot_down(uint8_t major = 0, char minor = 0, bool force = false) { (void)major; (void)minor; (void)force; return IS_OP_OK; }
 
     is_operation_result match_test(void* param);
 
@@ -86,9 +88,12 @@ public:
     is_operation_result upload_image(std::string image) { return IS_OP_OK; }
     is_operation_result verify_image(std::string image) { return IS_OP_OK; }
 
+    static int get_num_devices();
     static is_operation_result list_devices(is_dfu_list* list);
 
     bool is_serial_device() { return false; }
+
+    static std::mutex m_DFUmutex;
 
 private:
     typedef enum	// Internal only, can change as needed

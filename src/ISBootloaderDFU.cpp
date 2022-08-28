@@ -30,6 +30,8 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 
 using namespace ISBootloader;
 
+std::mutex cISBootloaderDFU::m_DFUmutex;
+
 static constexpr uint32_t STM32_PAGE_SIZE = 0x800;
 static constexpr uint32_t STM32_PAGE_ERROR_MASK = 0x7FF;
 
@@ -56,12 +58,60 @@ is_operation_result cISBootloaderDFU::match_test(void* param)
 {
     const char* uid = (const char*)param;
 
-    if(strlen(uid) != 0 && strlen(m_dfu.uid) != 0 && strncmp(uid, m_dfu.uid, 100) == 0)
+    if(strnlen(uid, 20) != 0 && strnlen(m_dfu.uid, 20) != 0 && strncmp(uid, m_dfu.uid, 20) == 0)
     {
         return IS_OP_OK;
     }
 
     return IS_OP_ERROR;
+}
+
+int cISBootloaderDFU::get_num_devices()
+{
+    int present = 0;
+
+    libusb_device** device_list;
+    libusb_device* dev;
+    libusb_device_handle* dev_handle;
+    struct libusb_device_descriptor desc;
+    struct libusb_config_descriptor* cfg;
+    int ret_libusb;
+
+    if(m_DFUmutex.try_lock())
+    {
+        libusb_init(NULL);
+
+        size_t device_count = libusb_get_device_list(NULL, &device_list);
+
+        for (size_t i = 0; i < (device_count - 1); ++i) {
+            dev = device_list[i];
+
+            ret_libusb = libusb_get_device_descriptor(dev, &desc);
+            if(ret_libusb < 0) continue;
+
+            // Check vendor and product ID
+            if (desc.idVendor != STM32_DESCRIPTOR_VENDOR_ID) continue;      // must be some other usb device
+            if (desc.idProduct != STM32_DESCRIPTOR_PRODUCT_ID) continue;     // must be some other usb device
+
+            ret_libusb = libusb_get_config_descriptor(device_list[i], 0, &cfg);
+
+            // USB-IF DFU interface class numbers
+            if(cfg->interface->altsetting[0].bInterfaceClass != 0xFE || 
+                cfg->interface->altsetting[0].bInterfaceSubClass != 0x01 || 
+                cfg->interface->altsetting[0].bInterfaceProtocol != 0x02
+            ) continue;
+
+            present++;
+        }
+
+        libusb_free_device_list(device_list, 1);
+
+        libusb_exit(NULL);
+
+        m_DFUmutex.unlock();
+    }
+
+    return present;
 }
 
 is_operation_result cISBootloaderDFU::list_devices(is_dfu_list* list)
@@ -77,7 +127,7 @@ is_operation_result cISBootloaderDFU::list_devices(is_dfu_list* list)
 
     size_t device_count = libusb_get_device_list(NULL, &device_list);
 
-    for (size_t i = 0; i < (device_count - 1); ++i) {
+    for (size_t i = 0; i < device_count; ++i) {
         dev = device_list[i];
 
         ret_libusb = libusb_get_device_descriptor(dev, &desc);
@@ -111,12 +161,9 @@ is_operation_result cISBootloaderDFU::list_devices(is_dfu_list* list)
         list->present++;
         if(list->present >= IS_DFU_LIST_LEN)
         {
-            libusb_close(dev_handle);
             libusb_free_device_list(device_list, 1);
             return IS_OP_OK;
         }
-
-        //libusb_close(dev_handle);
     }
 
     libusb_free_device_list(device_list, 1);
@@ -141,20 +188,22 @@ is_operation_result cISBootloaderDFU::get_serial_number_libusb(libusb_device_han
 
     uint8_t rxBuf[1024] = {0};
 
+    SLEEP_MS(100);
+
     // Reset the device
     ret_libusb = libusb_reset_device(*handle);
-    if (ret_libusb < LIBUSB_SUCCESS) { libusb_close(*handle); return IS_OP_ERROR; }
+    if (ret_libusb < LIBUSB_SUCCESS) { return IS_OP_ERROR; }
 
     ret_libusb = libusb_claim_interface(*handle, 0);
-    if (ret_libusb < LIBUSB_SUCCESS) { libusb_close(*handle); return IS_OP_ERROR; }
+    if (ret_libusb < LIBUSB_SUCCESS) { return IS_OP_ERROR; }
 
     // Cancel any existing operations
     ret_libusb = dfu_ABORT(handle);
-    if (ret_libusb < LIBUSB_SUCCESS) { libusb_close(*handle); return IS_OP_ERROR; }
+    if (ret_libusb < LIBUSB_SUCCESS) { return IS_OP_ERROR; }
 
     // Reset status to good
     ret_dfu = dfu_wait_for_state(handle, DFU_STATE_IDLE);
-    if (ret_dfu < DFU_ERROR_NONE) { libusb_close(*handle); return IS_OP_ERROR; }
+    if (ret_dfu < DFU_ERROR_NONE) { return IS_OP_ERROR; }
 
     // Get the string containing the serial number from the device
     unsigned char uid[IS_DFU_UID_MAX_SIZE];
@@ -209,6 +258,8 @@ is_operation_result cISBootloaderDFU::get_serial_number_libusb(libusb_device_han
 	if(memcmp(otp_mem - 8, &key, 8) == 0 && foundSn)
 	{
         sn = id->serialNumber;
+
+        libusb_release_interface(*handle, 0);
         return IS_OP_OK;
     }
 
@@ -232,26 +283,27 @@ is_operation_result cISBootloaderDFU::download_image(std::string filename)
 
     // Reset the device
     ret_libusb = libusb_reset_device(m_dfu.handle_libusb);
-    if(ret_libusb < LIBUSB_SUCCESS) 
+    if(ret_libusb < LIBUSB_SUCCESS)
     {
-        libusb_close(m_dfu.handle_libusb);
         return IS_OP_ERROR;
     }
 
+    SLEEP_MS(100);
+
     ret_libusb = libusb_claim_interface(m_dfu.handle_libusb, 0);
-    if (ret_libusb < LIBUSB_SUCCESS) { libusb_close(m_dfu.handle_libusb); return IS_OP_ERROR; }
+    if (ret_libusb < LIBUSB_SUCCESS) { return IS_OP_ERROR; }
 
     // Cancel any existing operations
     ret_libusb = dfu_ABORT(&m_dfu.handle_libusb);
-    if (ret_libusb < LIBUSB_SUCCESS) { libusb_close(m_dfu.handle_libusb); return IS_OP_ERROR; }
+    if (ret_libusb < LIBUSB_SUCCESS) { return IS_OP_ERROR; }
     
     // Reset status to good
     ret_dfu = dfu_wait_for_state(&m_dfu.handle_libusb, DFU_STATE_IDLE);
-    if (ret_dfu < DFU_ERROR_NONE) { libusb_close(m_dfu.handle_libusb); return IS_OP_ERROR; }
+    if (ret_dfu < DFU_ERROR_NONE) { return IS_OP_ERROR; }
 
     // Load the firmware image
     image_sections = ihex_load_sections(filename.c_str(), image, MAX_NUM_IHEX_SECTIONS);
-    if(image_sections <= 0) { libusb_close(m_dfu.handle_libusb); return IS_OP_ERROR; }
+    if(image_sections <= 0) { return IS_OP_ERROR; }
 
     int image_total_len = 0;
     for(size_t i = 0; i < image_sections; i++)
@@ -295,17 +347,17 @@ is_operation_result cISBootloaderDFU::download_image(std::string filename)
             memcpy(&eraseCommand[1], &pageAddress, 4);
 
             ret_libusb = dfu_DNLOAD(&m_dfu.handle_libusb, 0, eraseCommand, 5);
-            // if (ret_libusb < LIBUSB_SUCCESS) 
+            // if (ret_libusb < LIBUSB_SUCCESS)
             // {
             //     ihex_unload_sections(image, image_sections);
-            //     return IS_OP_ERROR;  
+            //     return IS_OP_ERROR;
             // }
 
             ret_dfu = dfu_wait_for_state(&m_dfu.handle_libusb, DFU_STATE_DNLOAD_IDLE);
-            // if (ret_dfu < DFU_ERROR_NONE) 
+            // if (ret_dfu < DFU_ERROR_NONE)
             // {
             //     ihex_unload_sections(image, image_sections);
-            //     return IS_OP_ERROR;  
+            //     return IS_OP_ERROR;
             // }
 
             byteInSection += STM32_PAGE_SIZE;
@@ -323,12 +375,13 @@ is_operation_result cISBootloaderDFU::download_image(std::string filename)
     // Write memory
     for(size_t i = 0; i < image_sections; i++)
     {
+        ret_dfu = dfu_wait_for_state(&m_dfu.handle_libusb, DFU_STATE_DNLOAD_IDLE);
+
         ret_dfu = dfu_set_address_pointer(&m_dfu.handle_libusb, image[i].address);
-        if (ret_dfu < DFU_ERROR_NONE) 
+        if (ret_dfu < DFU_ERROR_NONE)
         {
             ihex_unload_sections(image, image_sections);
-            libusb_close(m_dfu.handle_libusb);
-            return IS_OP_ERROR;  
+            return IS_OP_ERROR;
         }
 
         uint32_t byteInSection = 0;
@@ -352,16 +405,14 @@ is_operation_result cISBootloaderDFU::download_image(std::string filename)
             if (ret_libusb < LIBUSB_SUCCESS) 
             {
                 ihex_unload_sections(image, image_sections);
-                libusb_close(m_dfu.handle_libusb);
-                return IS_OP_ERROR;  
+                return IS_OP_ERROR;
             }
 
             ret_dfu = dfu_wait_for_state(&m_dfu.handle_libusb, DFU_STATE_DNLOAD_IDLE);
             if (ret_dfu < DFU_ERROR_NONE) 
             {
                 ihex_unload_sections(image, image_sections);
-                libusb_close(m_dfu.handle_libusb);
-                return IS_OP_ERROR;  
+                return IS_OP_ERROR;
             }
 
             byteInSection += payloadLen;
@@ -377,11 +428,13 @@ is_operation_result cISBootloaderDFU::download_image(std::string filename)
 
     // Cancel any existing operations
     ret_libusb = dfu_ABORT(&m_dfu.handle_libusb);
-    if (ret_libusb < LIBUSB_SUCCESS) { libusb_close(m_dfu.handle_libusb); return IS_OP_ERROR; }
+    if (ret_libusb < LIBUSB_SUCCESS) { return IS_OP_ERROR; }
     
     // Reset status to good
     ret_dfu = dfu_wait_for_state(&m_dfu.handle_libusb, DFU_STATE_IDLE);
-    if (ret_dfu < DFU_ERROR_NONE) { libusb_close(m_dfu.handle_libusb); return IS_OP_ERROR; }
+    if (ret_dfu < DFU_ERROR_NONE) { return IS_OP_ERROR; }
+
+    libusb_release_interface(m_dfu.handle_libusb, 0);
 
     return IS_OP_OK;
 }
@@ -413,8 +466,8 @@ is_operation_result cISBootloaderDFU::reboot_up()
     if (ret_dfu < DFU_ERROR_NONE) return IS_OP_ERROR;
 
     // Select the alt setting for option bytes
-    ret_libusb = libusb_set_interface_alt_setting(m_dfu.handle_libusb, 0, STM32_DFU_INTERFACE_OPTIONS);
-    if (ret_libusb < LIBUSB_SUCCESS) return IS_OP_ERROR;  
+//    ret_libusb = libusb_set_interface_alt_setting(m_dfu.handle_libusb, 0, STM32_DFU_INTERFACE_OPTIONS);
+//    if (ret_libusb < LIBUSB_SUCCESS) return IS_OP_ERROR;
 
     ret_dfu = dfu_set_address_pointer(&m_dfu.handle_libusb, 0x1FFF7800);
     if (ret_dfu < DFU_ERROR_NONE) return IS_OP_ERROR;
