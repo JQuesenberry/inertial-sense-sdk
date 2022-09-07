@@ -2708,7 +2708,7 @@ typedef struct PACKED
 POP_PACK
 
 PUSH_PACK_1
-
+#ifdef RTK_EMBEDDED
 /** (DID_GPS_RTK_OPT) RTK processing options */
 typedef struct
 {
@@ -2858,6 +2858,7 @@ typedef struct
 	int32_t outsingle;
 } prcopt_t;
 typedef prcopt_t gps_rtk_opt_t;
+#endif
 
 /** Raw satellite observation data */
 typedef struct PACKED
@@ -3357,9 +3358,12 @@ typedef enum
 
 	/** ion_model_utc_alm_t */
 	raw_data_type_ionosphere_model_utc_alm = 6,
-	
+
+	/** rtcm3 packet */
+	raw_data_type_rtcm3 = 7,
+
 	/** gps_rtk_misc_t */
-	raw_data_type_rtk_solution = 123
+	raw_data_type_rtk_solution = 123,
 } eRawDataType;
 
 typedef union PACKED
