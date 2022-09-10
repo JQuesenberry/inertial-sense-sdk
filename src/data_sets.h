@@ -2900,7 +2900,7 @@ typedef struct PACKED
 	float D[1];
 } obsd_t;
 
-#define GPS_RAW_MESSAGE_BUF_SIZE    1000
+#define GPS_RAW_MESSAGE_BUF_SIZE    2048
 #define MAX_OBSERVATION_COUNT_IN_RTK_MESSAGE (GPS_RAW_MESSAGE_BUF_SIZE / sizeof(obsd_t))
 
 /** observation data */
