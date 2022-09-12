@@ -2860,6 +2860,8 @@ typedef struct
 typedef prcopt_t gps_rtk_opt_t;
 #endif
 
+#define NFREQ 3
+
 /** Raw satellite observation data */
 typedef struct PACKED
 {
@@ -2873,31 +2875,31 @@ typedef struct PACKED
 	uint8_t rcv;
 
 	/** Cno, carrier-to-noise density ratio (signal strength) (0.25 dB-Hz) */
-	uint8_t SNR[1];
+	uint8_t SNR[NFREQ];
 
 	/** Loss of Lock Indicator. Set to non-zero values only when carrier-phase is valid (L > 0).  bit1 = loss-of-lock, bit2 = half-cycle-invalid */
-	uint8_t LLI[1];
+	uint8_t LLI[NFREQ];
 
 	/** Code indicator: CODE_L1C (1) = L1C/A,G1C/A,E1C (GPS,GLO,GAL,QZS,SBS), CODE_L1X (12) = E1B+C,L1C(D+P) (GAL,QZS), CODE_L1I (47) = B1I (BeiDou) */
-	uint8_t code[1];
+	uint8_t code[NFREQ];
 
 	/** Estimated carrier phase measurement standard deviation (0.004 cycles), zero means invalid */
-	uint8_t qualL[1];
+	uint8_t qualL[NFREQ];
 
 	/** Estimated pseudorange measurement standard deviation (0.01 m), zero means invalid */
-	uint8_t qualP[1];
+	uint8_t qualP[NFREQ];
 
 	/** reserved, for alignment */
 	uint8_t reserved;
 
 	/** Observation data carrier-phase (cycle). The carrier phase initial ambiguity is initialized using an approximate value to make the magnitude of the phase close to the pseudorange measurement. Clock resets are applied to both phase and code measurements in accordance with the RINEX specification. */
-	double L[1];
+	double L[NFREQ];
 
 	/** Observation data pseudorange (m). GLONASS inter frequency channel delays are compensated with an internal calibration table */
-	double P[1]; 
+	double P[NFREQ];
 
 	/** Observation data Doppler measurement (positive sign for approaching satellites) (Hz) */
-	float D[1];
+	float D[NFREQ];
 } obsd_t;
 
 #define GPS_RAW_MESSAGE_BUF_SIZE    2048
