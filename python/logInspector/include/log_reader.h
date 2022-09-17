@@ -6,6 +6,8 @@
 #include "ISLogger.h"
 #include "luna_data_sets.h"
 
+#include "../../../../cpp/libs/IS_internal.h"
+
 //#include "Eigen/Core"
 //#include "Eigen/St    dVector"
 
@@ -108,7 +110,7 @@ struct DeviceLog
     std::vector<rtk_residual_t> rtkCodeResidual;
     std::vector<rtk_residual_t> rtkPhaseResidual;
     std::vector<rtk_debug_t> rtkDebug;
-    // std::vector<rtk_debug_2_t> rtkDebug2;
+    std::vector<rtk_debug_2_t> rtkDebug2;
 //    std::vector<port_monitor_t> portMonitor;
 };
 
@@ -143,6 +145,8 @@ public:
     void log_message(int did, uint8_t* msg, std::vector<T>& vec)
     {
         vec.push_back(*(T*)msg);
+
+        if(did == DID_RTK_DEBUG_2) std::cout << 
     }
 
 private:

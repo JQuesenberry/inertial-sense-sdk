@@ -2708,7 +2708,6 @@ typedef struct PACKED
 POP_PACK
 
 PUSH_PACK_1
-#ifdef RTK_EMBEDDED
 /** (DID_GPS_RTK_OPT) RTK processing options */
 typedef struct
 {
@@ -2858,7 +2857,6 @@ typedef struct
 	int32_t outsingle;
 } prcopt_t;
 typedef prcopt_t gps_rtk_opt_t;
-#endif
 
 #define NFREQ 3
 

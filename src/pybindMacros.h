@@ -58,7 +58,6 @@ PYBIND11_NUMPY_DTYPE(barometer_t, time, bar, mslBar, barTemp, humidity);
 PYBIND11_NUMPY_DTYPE(imu_t, time, status, I);	
 PYBIND11_NUMPY_DTYPE(inl2_mag_obs_info_t, timeOfWeekMs, Ncal_samples, ready, calibrated, auto_recal, outlier, magHdg, insHdg, magInsHdgDelta, nis, nis_threshold, Wcal, activeCalSet, magHdgOffset, Tcal, bias_cal);
 // PYBIND11_NUMPY_DTYPE(gps_raw_t, receiverIndex, dataType, obsCount, reserved, data);
-// PYBIND11_NUMPY_DTYPE(gps_rtk_opt_t, mode, soltype, nf, navsys, elmin, snrmin, modear, glomodear, gpsmodear, sbsmodear, bdsmodear, arfilter, maxout, maxrej, minlock, minfixsats, minholdsats, mindropsats, rcvstds, minfix, armaxiter, dynamics, niter, intpref, rovpos, refpos, eratio, err, std, prn, sclkstab, thresar, elmaskar, elmaskhold, thresslip, varholdamb, gainholdamb, maxtdiff, fix_reset_base_msgs, maxinnocode, maxinnophase, maxnis, maxgdop, baseline, max_baseline_error, reset_baseline_error, max_ubx_error, ru, rb, maxaveep, outsingle, prcopt_t);
 PYBIND11_NUMPY_DTYPE(manufacturing_info_t, serialNumber, lotNumber, date, key, uid);
 PYBIND11_NUMPY_DTYPE(bit_t, state, hdwBitStatus, calBitStatus, tcPqrBias, tcAccBias, tcPqrSlope, tcAccSlope, tcPqrLinearity, tcAccLinearity, pqr, acc, pqrSigma, accSigma);
 PYBIND11_NUMPY_DTYPE(inl2_ned_sigma_t, timeOfWeekMs, PxyzNED, PvelNED, PattNED, PABias, PWBias, PBaroBias, PDeclination);
@@ -100,6 +99,15 @@ PYBIND11_NUMPY_DTYPE(ion_model_utc_alm_t, ion_gps, ion_gal, ion_qzs, ion_cmp, io
 // PYBIND11_NUMPY_DTYPE(hdw_params_t, timeOfWeekMs, I, update, gpsCnoSigma, gpsCnoMean);
 // PYBIND11_NUMPY_DTYPE(nvr_manage_t, flash_write_needed, flash_write_count);
 // PYBIND11_NUMPY_DTYPE(inl2_misc_t, gps_time_last_valid);
-// PYBIND11_NUMPY_DTYPE(rtk_debug_2_t, time, satBiasFloat, satBiasFix, qualL, sat, satBiasStd, satLockCnt, num_biases, reserved);
 
+#include "../../cpp/libs-int/rtklib/rtkdbg.h"
+#include "../../cpp/libs/IS_internal.h"
+
+// support types
+PYBIND11_NUMPY_DTYPE(rtkdbg_rtcm_t, msgId); 
+PYBIND11_NUMPY_DTYPE(rtkdbg_obs_t, obs, n, nu, nr); 
+PYBIND11_NUMPY_DTYPE(rtkdbg_eph_t, eph, n); 
+PYBIND11_NUMPY_DTYPE(gps_rtk_opt_t, mode, soltype, nf, navsys, elmin, snrmin, modear, glomodear, gpsmodear, sbsmodear, bdsmodear, arfilter, maxout, maxrej, minlock, minfixsats, minholdsats, mindropsats, rcvstds, minfix, armaxiter, dynamics, niter, intpref, rovpos, refpos, eratio, err, std, prn, sclkstab, thresar, elmaskar, elmaskhold, thresslip, varholdamb, gainholdamb, maxtdiff, fix_reset_base_msgs, maxinnocode, maxinnophase, maxnis, maxgdop, baseline, max_baseline_error, reset_baseline_error, max_ubx_error, ru, rb, maxaveep, outsingle);
+
+PYBIND11_NUMPY_DTYPE(rtk_debug_2_t, time, rtcm, obs_raw, obs_filt, eph, opt);
 

@@ -1534,122 +1534,157 @@ class logPlot:
                     i += 1
         ax[0,0].legend(ncol=2)
 
-    def rtkDebug2(self, fig=None):
+    def rtkDebug2Snr(self, fig=None):
         if fig is None:
             fig = plt.figure()
 
-        ax = fig.subplots(6, 4, sharex=True)
+        ax = fig.subplots(2, 3)
+        fig.suptitle('RTK Observation SNR ' + os.path.basename(os.path.normpath(self.log.directory)))
 
-        #max_num_biases = 22 #np.array(self.getData(self.active_devs[0], DID_RTK_DEBUG_2, 'num_biases'))
-        max_num_biases = self.getData(0, DID_RTK_DEBUG_2, 'num_biases')[-1]
-        for r in range(0,6):
-            for c in range(0,4):
-                self.configureSubplot(ax[r,c], '', '')
-
-        fig.suptitle('RTK Debug2 - ' + os.path.basename(os.path.normpath(self.log.directory)))
         for d in self.active_devs:
             time = np.array(getTimeFromGTime(self.getData(d, DID_RTK_DEBUG_2, 'time')))
-            ib = 0
-            for r in range(0, 6):
-                for c in range(0, 4):
-                    if ib < max_num_biases:
-                        ax[r,c].plot(time, self.getData(d, DID_RTK_DEBUG_2, 'satBiasFloat')[:, c + r * 4], label=self.log.serials[d])
-                        r1 = r
-                        c1 = c
-                    ib = ib + 1
+            
+            obs_raw = self.getData(d, DID_RTK_DEBUG_2, 'obs_filt')     # Change string to 'obs_raw' for more signals that didn't make it through the filter
 
-        # Show serial numbers
-        ax[r1,c1].legend(ncol=2)
+            sats = np.unique(obs_raw[:]['obs'][:]['sat'])
+            sats = [i for i in sats if i != 0]
+
+            snr_rover = np.zeros((np.size(sats), np.size(obs_raw), 3)) # Num sats, num samples, 3 frequencies  
+            snr_base = np.zeros((np.size(sats), np.size(obs_raw), 3)) # Num sats, num samples, 3 frequencies  
+
+            for satcount, sat in enumerate(sats):
+                for collectioncount, obs_collection in enumerate(obs_raw):
+                    for obscount, obs in enumerate(obs_collection['obs']):
+                        if obs['sat'] == sat:
+                            if obscount >= obs_collection['nu']:
+                                snr_rover[satcount,collectioncount] = obs['SNR']
+                            else:
+                                snr_base[satcount,collectioncount] = obs['SNR']
+
+                for freq in range(0,3):
+                    ax[0,freq].plot(time, snr_rover[satcount, :, freq], label=str(sat))
+                    ax[1,freq].plot(time, snr_base[satcount, :, freq], label=str(sat))
+
+        ax[0,0].set_title('ROV L1')
+        ax[0,1].set_title('ROV L2')
+        ax[0,2].set_title('ROV L5')  
+        ax[1,0].set_title('BAS L1')
+        ax[1,1].set_title('BAS L2')
+        ax[1,2].set_title('BAS L5')  
+            
+        ax[0,1].legend(ncol=2)
 
         for a in ax:
             for b in a:
                 b.grid(True)
 
-    def rtkDebug2Sat(self, fig=None):
+    def rtkDebug2LPD(self, fig=None):
         if fig is None:
             fig = plt.figure()
 
-        ax = fig.subplots(6, 4, sharex=True)
+        ax = fig.subplots(6, 3, sharex=True)
+        fig.suptitle('RTK Observation LPD ' + os.path.basename(os.path.normpath(self.log.directory)))
 
-        max_num_biases = self.getData(0, DID_RTK_DEBUG_2, 'num_biases')[-1]
-        for r in range(0,6):
-            for c in range(0,4):
-                self.configureSubplot(ax[r,c], '', '')
-
-        fig.suptitle('RTK Debug2 - Sat# - ' + os.path.basename(os.path.normpath(self.log.directory)))
         for d in self.active_devs:
             time = np.array(getTimeFromGTime(self.getData(d, DID_RTK_DEBUG_2, 'time')))
-            ib = 0
-            for r in range(0, 6):
-                for c in range(0, 4):
-                    if ib < max_num_biases:
-                        ax[r,c].plot(time, self.getData(d, DID_RTK_DEBUG_2, 'sat')[:, c + r * 4], label=self.log.serials[d])
-                        r1 = r
-                        c1 = c
-                    ib = ib + 1
+            
+            obs_raw = self.getData(d, DID_RTK_DEBUG_2, 'obs_filt')     # Change string to 'obs_raw' for more signals that didn't make it through the filter
 
-        # Show serial numbers
-        ax[r1,c1].legend(ncol=2)
+            sats = np.unique(obs_raw[:]['obs'][:]['sat'])
+            sats = [i for i in sats if i != 0]
+
+            l_rover = np.zeros((np.size(sats), np.size(obs_raw), 3)) # Num sats, num samples, 3 frequencies  
+            l_base = np.zeros((np.size(sats), np.size(obs_raw), 3)) # Num sats, num samples, 3 frequencies  
+            p_rover = np.zeros((np.size(sats), np.size(obs_raw), 3)) # Num sats, num samples, 3 frequencies  
+            p_base = np.zeros((np.size(sats), np.size(obs_raw), 3)) # Num sats, num samples, 3 frequencies  
+            d_rover = np.zeros((np.size(sats), np.size(obs_raw), 3)) # Num sats, num samples, 3 frequencies  
+            d_base = np.zeros((np.size(sats), np.size(obs_raw), 3)) # Num sats, num samples, 3 frequencies  
+
+            for satcount, sat in enumerate(sats):
+                for collectioncount, obs_collection in enumerate(obs_raw):
+                    for obscount, obs in enumerate(obs_collection['obs']):
+                        if obs['sat'] == sat:
+                            if obscount >= obs_collection['nu']:
+                                l_rover[satcount,collectioncount] = obs['L']
+                                p_rover[satcount,collectioncount] = obs['P']
+                                d_rover[satcount,collectioncount] = obs['D']
+                            else:
+                                l_base[satcount,collectioncount] = obs['L']
+                                p_base[satcount,collectioncount] = obs['P']
+                                d_base[satcount,collectioncount] = obs['D']
+
+                for freq in range(0,3):
+                    ax[0,freq].plot(time, l_rover[satcount, :, freq], label=str(sat))
+                    ax[1,freq].plot(time, p_rover[satcount, :, freq], label=str(sat))
+                    ax[2,freq].plot(time, d_rover[satcount, :, freq], label=str(sat))
+                    ax[3,freq].plot(time, l_base[satcount, :, freq], label=str(sat))
+                    ax[4,freq].plot(time, p_base[satcount, :, freq], label=str(sat))
+                    ax[5,freq].plot(time, d_base[satcount, :, freq], label=str(sat))
+
+        ax[0,0].set_title('ROV L1 Carrier Phase (cycle)')
+        ax[0,1].set_title('ROV L2 Carrier Phase (cycle)')
+        ax[0,2].set_title('ROV L5 Carrier Phase (cycle)')   
+        ax[1,0].set_title('ROV L1 Pseudorange (m)')
+        ax[1,1].set_title('ROV L2 Pseudorange (m)')
+        ax[1,2].set_title('ROV L5 Pseudorange (m)')
+        ax[2,0].set_title('ROV L1 Doppler (Hz)')
+        ax[2,1].set_title('ROV L2 Doppler (Hz)')
+        ax[2,2].set_title('ROV L5 Doppler (Hz)')
+        ax[3,0].set_title('BAS L1 Carrier Phase (cycle)')
+        ax[3,1].set_title('BAS L2 Carrier Phase (cycle)')
+        ax[3,2].set_title('BAS L5 Carrier Phase (cycle)')   
+        ax[4,0].set_title('BAS L1 Pseudorange (m)')
+        ax[4,1].set_title('BAS L2 Pseudorange (m)')
+        ax[4,2].set_title('BAS L5 Pseudorange (m)')
+        ax[5,0].set_title('BAS L1 Doppler (Hz)')
+        ax[5,1].set_title('BAS L2 Doppler (Hz)')
+        ax[5,2].set_title('BAS L5 Doppler (Hz)')
+            
+        ax[0,1].legend(ncol=2)
 
         for a in ax:
             for b in a:
                 b.grid(True)
 
-    def rtkDebug2Std(self, fig=None):
+    def rtkDebug2LLI(self, fig=None):
         if fig is None:
             fig = plt.figure()
 
-        ax = fig.subplots(6, 4, sharex=True)
+        ax = fig.subplots(2, 3, sharex=True)
+        fig.suptitle('RTK Observation LLI ' + os.path.basename(os.path.normpath(self.log.directory)))
 
-        max_num_biases = self.getData(0, DID_RTK_DEBUG_2, 'num_biases')[-1]
-        for r in range(0,6):
-            for c in range(0,4):
-                self.configureSubplot(ax[r,c], '', '')
-
-        fig.suptitle('RTK Debug 2 - Sat Bias Std - ' + os.path.basename(os.path.normpath(self.log.directory)))
         for d in self.active_devs:
             time = np.array(getTimeFromGTime(self.getData(d, DID_RTK_DEBUG_2, 'time')))
-            ib = 0
-            for r in range(0, 6):
-                for c in range(0, 4):
-                    if ib < max_num_biases:
-                        ax[r,c].plot(time, self.getData(d, DID_RTK_DEBUG_2, 'satBiasStd')[:, c + r * 4], label=self.log.serials[d])
-                        r1 = r
-                        c1 = c
-                    ib = ib + 1
+            
+            obs_raw = self.getData(d, DID_RTK_DEBUG_2, 'obs_filt')     # Change string to 'obs_raw' for more signals that didn't make it through the filter
 
-        # Show serial numbers
-        ax[r1,c1].legend(ncol=2)
+            sats = np.unique(obs_raw[:]['obs'][:]['sat'])
+            sats = [i for i in sats if i != 0]
 
-        for a in ax:
-            for b in a:
-                b.grid(True)
+            lli_rover = np.zeros((np.size(sats), np.size(obs_raw), 3)) # Num sats, num samples, 3 frequencies  
+            lli_base = np.zeros((np.size(sats), np.size(obs_raw), 3)) # Num sats, num samples, 3 frequencies  
 
-    def rtkDebug2Lock(self, fig=None):
-        if fig is None:
-            fig = plt.figure()
+            for satcount, sat in enumerate(sats):
+                for collectioncount, obs_collection in enumerate(obs_raw):
+                    for obscount, obs in enumerate(obs_collection['obs']):
+                        if obs['sat'] == sat:
+                            if obscount >= obs_collection['nu']:
+                                lli_rover[satcount,collectioncount] = obs['LLI']
+                            else:
+                                lli_base[satcount,collectioncount] = obs['LLI']
 
-        ax = fig.subplots(6, 4, sharex=True)
+                for freq in range(0,3):
+                    ax[0,freq].plot(time, lli_rover[satcount, :, freq], label=str(sat))
+                    ax[1,freq].plot(time, lli_base[satcount, :, freq], label=str(sat))
 
-        max_num_biases = self.getData(0, DID_RTK_DEBUG_2, 'num_biases')[-1]
-        for r in range(0,6):
-            for c in range(0,4):
-                self.configureSubplot(ax[r,c], '', '')
-
-        fig.suptitle('RTK Debug 2 - Lock Count - ' + os.path.basename(os.path.normpath(self.log.directory)))
-        for d in self.active_devs:
-            time = np.array(getTimeFromGTime(self.getData(d, DID_RTK_DEBUG_2, 'time')))
-            ib = 0
-            for r in range(0, 6):
-                for c in range(0, 4):
-                    if ib < max_num_biases:
-                        ax[r,c].plot(time, self.getData(d, DID_RTK_DEBUG_2, 'satLockCnt')[:, c + r * 4], label=self.log.serials[d])
-                        r1 = r
-                        c1 = c
-                    ib = ib + 1
-
-        # Show serial numbers
-        ax[r1,c1].legend(ncol=2)
+        ax[0,0].set_title('ROV L1 LLI')
+        ax[0,1].set_title('ROV L2 LLI')
+        ax[0,2].set_title('ROV L5 LLI')   
+        ax[1,0].set_title('BAS L1 LLI')
+        ax[1,1].set_title('BAS L2 LLI')
+        ax[1,2].set_title('BAS L5 LLI')
+            
+        ax[0,1].legend(ncol=2)
 
         for a in ax:
             for b in a:

@@ -58,8 +58,10 @@ bool cISLogger::LogHeaderIsCorrupt(const p_data_hdr_t* hdr)
     bool corrupt = (hdr != NULL &&
     (
         hdr->size == 0 ||
-        hdr->offset + hdr->size > MAX_DATASET_SIZE ||
-        hdr->id == 0 ||
+
+        // hdr->offset + hdr->size > MAX_DATASET_SIZE ||
+
+		hdr->id == 0 ||
 //         hdr->id >= DID_COUNT ||
         hdr->offset % 4 != 0 // ||
 //        hdr->size % 4 != 0

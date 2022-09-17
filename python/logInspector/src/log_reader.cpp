@@ -211,7 +211,7 @@ void LogReader::organizeData(int device_id)
         HANDLE_MSG( DID_RTK_CODE_RESIDUAL, dev_log_->rtkCodeResidual);
         HANDLE_MSG( DID_RTK_PHASE_RESIDUAL, dev_log_->rtkPhaseResidual);
         HANDLE_MSG( DID_RTK_DEBUG, dev_log_->rtkDebug);
-        // HANDLE_MSG( DID_RTK_DEBUG_2, dev_log_->rtkDebug2);
+        HANDLE_MSG( DID_RTK_DEBUG_2, dev_log_->rtkDebug2);
 
         default:
             //            printf("Unhandled IS message DID: %d\n", message_type);
@@ -305,7 +305,7 @@ void LogReader::forwardData(int id)
     forward_message( DID_RTK_CODE_RESIDUAL, dev_log_->rtkCodeResidual, id);
     forward_message( DID_RTK_PHASE_RESIDUAL, dev_log_->rtkPhaseResidual, id);
     forward_message( DID_RTK_DEBUG, dev_log_->rtkDebug, id);
-    // forward_message( DID_RTK_DEBUG_2, dev_log_->rtkDebug2, id);
+    forward_message( DID_RTK_DEBUG_2, dev_log_->rtkDebug2, id);
 }
 
 bool LogReader::load()
