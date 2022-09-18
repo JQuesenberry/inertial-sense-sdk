@@ -4269,18 +4269,18 @@ int ubxSys(int gnssID);
 #define MAXRAWLEN 2048
 
 #undef NFREQ
-#define NFREQ 1
+#define NFREQ 3
 
 #undef NFREQGLO
 #ifdef ENAGLO
-#define NFREQGLO 1
+#define NFREQGLO 3
 #else
 #define NFREQGLO 0
 #endif
 
 #undef NFREQGAL
 #ifdef ENAGAL
-#define NFREQGAL 1
+#define NFREQGAL 3
 #else
 #define NFREQGAL 0
 #endif

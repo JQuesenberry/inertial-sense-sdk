@@ -194,19 +194,34 @@ class logPlot:
     def llaGps(self, fig=None):
         if fig is None:
             fig = plt.figure()
-        ax = fig.subplots(3,1, sharex=True)
-        self.configureSubplot(ax[0], 'Latitude', 'deg')
-        self.configureSubplot(ax[1], 'Longitude', 'deg')
-        self.configureSubplot(ax[2], 'Altitude', 'deg')
+        ax = fig.subplots(3,2, sharex=True)
+        self.configureSubplot(ax[0,0], 'Latitude', 'deg')
+        self.configureSubplot(ax[1,0], 'Longitude', 'deg')
+        self.configureSubplot(ax[2,0], 'Altitude', 'deg')
+        self.configureSubplot(ax[0,1], 'Latitude', 'deg')
+        self.configureSubplot(ax[1,1], 'Longitude', 'deg')
+        self.configureSubplot(ax[2,1], 'Altitude', 'deg')
         fig.suptitle('GPS LLA - ' + os.path.basename(os.path.normpath(self.log.directory)))
         for d in self.active_devs:
             time = getTimeFromTowMs(self.getData(d, DID_GPS1_POS, 'timeOfWeekMs'))
-            ax[0].plot(time, self.getData(d, DID_GPS1_POS, 'lla')[:,0], label=self.log.serials[d])
-            ax[1].plot(time, self.getData(d, DID_GPS1_POS, 'lla')[:,1])
-            ax[2].plot(time, self.getData(d, DID_GPS1_POS, 'lla')[:,2])
-        ax[0].legend(ncol=2)
+            ax[0,0].plot(time, self.getData(d, DID_GPS1_POS, 'lla')[:,0], label=str(self.log.serials[d]) + ' GPS1')
+            ax[1,0].plot(time, self.getData(d, DID_GPS1_POS, 'lla')[:,1])
+            ax[2,0].plot(time, self.getData(d, DID_GPS1_POS, 'lla')[:,2])
+
+            ax[0,0].plot(time, self.getData(d, DID_GPS2_POS, 'lla')[:,0], label=str(self.log.serials[d]) + ' GPS2')
+            ax[1,0].plot(time, self.getData(d, DID_GPS2_POS, 'lla')[:,1])
+            ax[2,0].plot(time, self.getData(d, DID_GPS2_POS, 'lla')[:,2])
+
+            timertkpntpos = getTimeFromGTime(self.getData(d, DID_RTK_DEBUG_2, 'sol_rov')[:]['time'])
+
+            ax[0,1].plot(timertkpntpos, self.getData(d, DID_RTK_DEBUG_2, 'sol_rov')[:]['rr'][:,0])
+            ax[1,1].plot(timertkpntpos, self.getData(d, DID_RTK_DEBUG_2, 'sol_rov')[:]['rr'][:,1])
+            ax[2,1].plot(timertkpntpos, self.getData(d, DID_RTK_DEBUG_2, 'sol_rov')[:]['rr'][:,2])
+
+        ax[0,0].legend(ncol=2)
         for a in ax:
-            a.grid(True)
+            for b in a:
+                b.grid(True)
         self.saveFig(fig, 'llaGPS')
 
     def velNED(self, fig=None):

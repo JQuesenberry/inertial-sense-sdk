@@ -108,6 +108,9 @@ PYBIND11_NUMPY_DTYPE(rtkdbg_rtcm_t, msgId);
 PYBIND11_NUMPY_DTYPE(rtkdbg_obs_t, obs, n, nu, nr); 
 PYBIND11_NUMPY_DTYPE(rtkdbg_eph_t, eph, n); 
 PYBIND11_NUMPY_DTYPE(gps_rtk_opt_t, mode, soltype, nf, navsys, elmin, snrmin, modear, glomodear, gpsmodear, sbsmodear, bdsmodear, arfilter, maxout, maxrej, minlock, minfixsats, minholdsats, mindropsats, rcvstds, minfix, armaxiter, dynamics, niter, intpref, rovpos, refpos, eratio, err, std, prn, sclkstab, thresar, elmaskar, elmaskhold, thresslip, varholdamb, gainholdamb, maxtdiff, fix_reset_base_msgs, maxinnocode, maxinnophase, maxnis, maxgdop, baseline, max_baseline_error, reset_baseline_error, max_ubx_error, ru, rb, maxaveep, outsingle);
+PYBIND11_NUMPY_DTYPE(mm_relpos1_t, rs, dts, e, azel);
+PYBIND11_NUMPY_DTYPE(mm_relpos2_t, rs, dts, y, e, azel, xp, Pp, xa, v, H, R, bias);
+PYBIND11_NUMPY_DTYPE(sol_t, time, rr, qr, qv, dtr, type, stat, ns, age, ratio, prev_ratio1, prev_ratio2, thres, dop, dist_to_base);
 
-PYBIND11_NUMPY_DTYPE(rtk_debug_2_t, time, rtcm, obs_raw, obs_filt, eph, opt);
+PYBIND11_NUMPY_DTYPE(rtk_debug_2_t, time, rtcm, obs_filt, opt, relpos1, sol_rov);
 

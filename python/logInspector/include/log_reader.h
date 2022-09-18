@@ -145,8 +145,6 @@ public:
     void log_message(int did, uint8_t* msg, std::vector<T>& vec)
     {
         vec.push_back(*(T*)msg);
-
-        if(did == DID_RTK_DEBUG_2) std::cout << 
     }
 
 private:
