@@ -190,6 +190,9 @@ is_operation_result cISBootloaderBase::mode_device_app
     cISBootloaderBase** new_context
 )
 {
+    (void)contexts;
+    (void)addMutex;
+
     cISBootloaderBase* obj;
     *new_context = NULL;
 
@@ -309,17 +312,17 @@ is_operation_result cISBootloaderBase::get_device_isb_version(
         {
             if(major != 0 && minor != 0)
             {
-                if(major < (obj)->isb_major)
+                if(major < (obj)->m_isb_major)
                 {
                     (obj)->isb_mightUpdate = false;
                 }
-                else if(major == (obj)->isb_major)
+                else if(major == (obj)->m_isb_major)
                 {
-                    if(minor < (obj)->isb_minor)
+                    if(minor < (obj)->m_isb_minor)
                     {
                         (obj)->isb_mightUpdate = false;
                     }
-                    else if(minor == (obj)->isb_minor)
+                    else if(minor == (obj)->m_isb_minor)
                     {
                         (obj)->isb_mightUpdate = false;
                     }
@@ -349,6 +352,9 @@ is_operation_result cISBootloaderBase::mode_device_isb
     cISBootloaderBase** new_context
 )
 {
+    (void)contexts;
+    (void)addMutex;
+
     cISBootloaderBase* obj;
     *new_context = NULL;
 
@@ -357,10 +363,10 @@ is_operation_result cISBootloaderBase::mode_device_isb
 
     uint32_t device = IS_IMAGE_SIGN_NONE;
     uint32_t fw_uINS_3 = get_image_signature(filenames.fw_uINS_3.path) & (IS_IMAGE_SIGN_UINS_3_16K | IS_IMAGE_SIGN_UINS_3_24K);
-    uint32_t bl_uINS_3 = get_image_signature(filenames.bl_uINS_3.path, &major, &minor) & (IS_IMAGE_SIGN_ISB_SAMx70_16K | IS_IMAGE_SIGN_ISB_SAMx70_24K);
+    //uint32_t bl_uINS_3 = get_image_signature(filenames.bl_uINS_3.path, &major, &minor) & (IS_IMAGE_SIGN_ISB_SAMx70_16K | IS_IMAGE_SIGN_ISB_SAMx70_24K);
     uint32_t fw_IMX_5 = get_image_signature(filenames.fw_IMX_5.path) & IS_IMAGE_SIGN_UINS_5;
     uint32_t bl_IMX_5 = get_image_signature(filenames.bl_IMX_5.path, &major, &minor) & IS_IMAGE_SIGN_ISB_STM32L4;
-    uint32_t fw_EVB_2  = get_image_signature(filenames.fw_EVB_2.path)  & (IS_IMAGE_SIGN_EVB_2_16K | IS_IMAGE_SIGN_EVB_2_24K);
+    //uint32_t fw_EVB_2  = get_image_signature(filenames.fw_EVB_2.path)  & (IS_IMAGE_SIGN_EVB_2_16K | IS_IMAGE_SIGN_EVB_2_24K);
     uint32_t bl_EVB_2  = get_image_signature(filenames.bl_EVB_2.path, &major, &minor)  & (IS_IMAGE_SIGN_ISB_SAMx70_16K | IS_IMAGE_SIGN_ISB_SAMx70_24K);
 
     obj = new cISBootloaderISB(updateProgress, verifyProgress, statusfn, handle);
@@ -372,7 +378,7 @@ is_operation_result cISBootloaderBase::mode_device_isb
     }
     else if(device)
     {   // Firmware for a device must be specified to update its bootloader
-        if (((device & IS_IMAGE_SIGN_APP) & fw_EVB_2) && ((device & IS_IMAGE_SIGN_ISB) & bl_EVB_2))
+        if ((device & IS_IMAGE_SIGN_ISB) & bl_EVB_2)
         {
             (obj)->m_filename = filenames.bl_EVB_2.path;
             is_operation_result op = (obj)->reboot_down(major, minor, force);
@@ -404,7 +410,7 @@ is_operation_result cISBootloaderBase::mode_device_isb
                 return IS_OP_CLOSED;
             }
         }
-        else if (((device & IS_IMAGE_SIGN_ISB) & bl_uINS_3) && ((device & IS_IMAGE_SIGN_APP) & fw_uINS_3))
+        else if ((device & IS_IMAGE_SIGN_APP) & fw_uINS_3)
         {
             (obj)->m_filename = filenames.bl_uINS_3.path;
             is_operation_result op = (obj)->reboot_down(major, minor, force);

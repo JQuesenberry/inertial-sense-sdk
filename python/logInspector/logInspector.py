@@ -197,7 +197,7 @@ class FlashConfigDialog(QDialog):
         self.table.setHorizontalHeaderLabels([str(ser) for ser in log.serials])
         self.table.setVerticalHeaderLabels(field_names)
 
-        hex_fields = ['ioConfig', 'cBrdConfig', 'RTKCfgBits', 'sysCfgBits']
+        hex_fields = ['ioConfig', 'platformConfig', 'RTKCfgBits', 'sysCfgBits']
         for d in range(log.numDev):
             for f, field in enumerate(field_names):
                 if field in hex_fields:
@@ -274,9 +274,15 @@ class LogInspectorWindow(QMainWindow):
         self.plot(self.currently_selected, self.plotargs)
 
     def updateWindowTitle(self):
-        if np.shape(self.log.data[0,DID_DEV_INFO])[0] != 0:
+        size = self.log.numDev
+        if  size != 0:
             info = self.log.data[0,DID_DEV_INFO][0]
-            infoStr = 'SN' + str(info[1]) + ', H:' + verArrayToString(info[2]) + ', F:' + verArrayToString(info[3]) + ' build ' + str(info[4]) + ', ' + dateTimeArrayToString(info[8], info[9]) + ', ' + info[10].decode('UTF-8')
+            if size == 1:
+                infoStr = 'SN' + str(info[1]) + ', H:' + verArrayToString(info[2]) + ', F:' + verArrayToString(info[3]) + ' build ' + str(info[4]) + ', ' + dateTimeArrayToString(info[8], info[9]) + ', ' + info[10].decode('UTF-8')
+            else:
+                infoStr = 'Multiple units - '
+                for i in range(size):
+                    infoStr = infoStr + str(self.log.serials[i]) + ' '
             self.setWindowTitle("LogInspector  -  " + infoStr)
 
     def choose_directory(self):

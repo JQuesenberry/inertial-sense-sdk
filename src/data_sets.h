@@ -71,8 +71,8 @@ typedef uint32_t eDataIDs;
 #define DID_DEBUG_STRING                (eDataIDs)37 /** INTERNAL USE ONLY (debug_string_t) */
 #define DID_RTOS_INFO                   (eDataIDs)38 /** (rtos_info_t) RTOS information. */
 #define DID_DEBUG_ARRAY                 (eDataIDs)39 /** INTERNAL USE ONLY (debug_array_t) */
-#define DID_SENSORS_CAL1                (eDataIDs)40 /** INTERNAL USE ONLY (sensors_mpu_w_temp_t) (not used) */
-#define DID_SENSORS_CAL2                (eDataIDs)41 /** INTERNAL USE ONLY (sensors_mpu_w_temp_t) (not used) */
+#define DID_SENSORS_MCAL                (eDataIDs)40 /** INTERNAL USE ONLY (sensors_w_temp_t) Temperature compensated and motion calibrated IMU output. */
+#define DID_GPS1_TIMEPULSE              (eDataIDs)41 /** INTERNAL USE ONLY (gps_timepulse_t) */
 #define DID_CAL_SC                      (eDataIDs)42 /** INTERNAL USE ONLY (sensor_cal_t) */
 #define DID_CAL_TEMP_COMP               (eDataIDs)43 /** INTERNAL USE ONLY (sensor_tcal_group_t) */
 #define DID_CAL_MOTION                  (eDataIDs)44 /** INTERNAL USE ONLY (sensor_mcal_group_t) */
@@ -98,7 +98,7 @@ typedef uint32_t eDataIDs;
 #define DID_BIT                         (eDataIDs)64 /** (bit_t) System built-in self-test */
 #define DID_INS_3                       (eDataIDs)65 /** (ins_3_t) Inertial navigation data with quaternion NED to body rotation and ECEF position. */
 #define DID_INS_4                       (eDataIDs)66 /** (ins_4_t) INS output: quaternion rotation w/ respect to ECEF, ECEF position. */
-#define DID_INL2_NED_SIGMA              (eDataIDs)67 /** (inl2_ned_sigma_t) INL2 standard deviation in the NED frame */
+#define DID_INL2_NED_SIGMA              (eDataIDs)67 /** (inl2_ned_sigma_t) Standard deviation of INL2 EKF estimates in the NED frame. */
 #define DID_STROBE_IN_TIME              (eDataIDs)68 /** (strobe_in_time_t) Timestamp for input strobe. */
 #define DID_GPS1_RAW                    (eDataIDs)69 /** (gps_raw_t) GPS raw data for rover (observation, ephemeris, etc.) - requires little endian CPU. The contents of data can vary for this message and are determined by dataType field. RTK positioning or RTK compassing must be enabled to stream this message. */
 #define DID_GPS2_RAW                    (eDataIDs)70 /** (gps_raw_t) GPS raw data for rover (observation, ephemeris, etc.) - requires little endian CPU. The contents of data can vary for this message and are determined by dataType field. RTK positioning or RTK compassing must be enabled to stream this message. */
@@ -166,7 +166,7 @@ typedef uint32_t eDataIDs;
 #define RECEIVER_INDEX_EXTERNAL_BASE 2 // DO NOT CHANGE
 #define RECEIVER_INDEX_GPS2 3 // DO NOT CHANGE
 
-// Max number of devices across all hardware types: uINS-3, uINS-4, and uINS-5
+// Max number of devices across all hardware types: uINS-3, uINS-4, and IMX-5
 #define NUM_IMU_DEVICES     3		// g_numImuDevices defines the actual number of hardware specific devices
 #define NUM_MAG_DEVICES     2		// g_numMagDevices defines the actual number of hardware specific devices
 
@@ -333,7 +333,7 @@ enum eHdwStatusFlags
 	HDW_STATUS_ERR_COM_RX_OVERRUN				= (int)0x00020000,
 
 	/** GPS PPS timepulse signal has not been received or is in error */
-	HDW_STATUS_ERR_GPS_PPS_ERROR				= (int)0x00040000,
+	HDW_STATUS_ERR_NO_GPS_PPS					= (int)0x00040000,
 	/** Time synchronized by GPS PPS */
 	HDW_STATUS_GPS_PPS_TIMESYNC					= (int)0x00080000,
 
@@ -381,9 +381,9 @@ enum eSysStatusFlags
 
 // Used to validate GPS position (and velocity)
 #define GPS_THRESH_SATS_USED			5
-#define GPS_THRESH_DOP					5.0f
-#define GPS_THRESH_H_ACC				20.0f
-#define GPS_THRESH_V_ACC				40.0f
+#define GPS_THRESH_P_DOP				3.0f
+#define GPS_THRESH_H_ACC				10.0f
+#define GPS_THRESH_V_ACC				20.0f
 #define GPS_THRESH_S_ACC				2.0f
 
 /** GPS Status */
@@ -1309,22 +1309,6 @@ typedef struct PACKED
 	
 } ascii_msgs_u32_t;
 
-/* (DID_SENSORS_CAL1, DID_SENSORS_CAL2) */
-typedef struct PACKED
-{
-	/** (rad/s) Angular rate.  Units only apply for calibrated data. */
-	f_t						pqr[3];
-
-	/** (m/s^2) Linear acceleration.  Units only apply for calibrated data. */
-	f_t						acc[3];
-
-	/** (uT) Magnetometers.  Units only apply for calibrated data. */
-	f_t						mag[3];
-
-	/** (°C) Temperature of MPU.  Units only apply for calibrated data. */
-	f_t						temp;
-} sensors_mpu_w_temp_t;
-
 typedef struct PACKED
 {
 	/** (rad/s) Gyros.  Units only apply for calibrated data. */
@@ -1368,7 +1352,7 @@ typedef struct PACKED
 	f_t						xyz[3];
 } mag_xyz_t;
 
-// (DID_SENSORS_UCAL, DID_SENSORS_TCAL)
+// (DID_SENSORS_UCAL, DID_SENSORS_TCAL, DID_SENSORS_MCAL)
 typedef struct PACKED
 {
 	imu3_t					imu3;
@@ -2115,7 +2099,7 @@ enum eSensorConfig
 	SENSOR_CFG_ACC_DLPF_MASK			= (int)0x0000F000,
 	SENSOR_CFG_ACC_DLPF_OFFSET			= (int)12,
 
-	/** Euler rotation of IMU and magnetometer from sensor frame to output frame.  Rotation applied in the order of yaw, pitch, roll from the sensor frame (labeled on uINS). */
+	/** Euler rotation of IMU and magnetometer from Hardware Frame to Sensor Frame.  Rotation applied in the order of yaw, pitch, roll from the sensor frame (labeled on uINS). */
 	SENSOR_CFG_SENSOR_ROTATION_MASK        = (int)0x00FF0000,
 	SENSOR_CFG_SENSOR_ROTATION_OFFSET      = (int)16,
 	SENSOR_CFG_SENSOR_ROTATION_0_0_0       = (int)0,	// roll, pitch, yaw rotation (deg).
@@ -2177,8 +2161,8 @@ enum eIoConfig
 	IO_CONFIG_G9_STROBE_INPUT                   = (int)0x00000010,
 	/** G9 - Enable Nav update strobe output pulse on G9 (uINS pin 10) indicating preintegrated IMU and navigation updates */
 	IO_CONFIG_G9_STROBE_OUTPUT_NAV              = (int)0x00000020,
-	/** G9 - Quadrature wheel encoder input (QDEC0-B). */
-	IO_CONFIG_G9_QDEC0_INPUT                    = (int)0x00000030,
+	/** G9 - SPI DRDY */
+	IO_CONFIG_G9_SPI_DRDY                    	= (int)0x00000030,
 	/** G9 - Bit mask */
 	IO_CONFIG_G9_MASK                           = (int)0x00000030,
 	/** G9 - Default */
@@ -2188,7 +2172,7 @@ enum eIoConfig
 	/** G6,G7 - General Communications on Ser1. Excludes GPS communications.  Overriden when SPI is enabled (G9 held low on bootup/config). */
 	IO_CONFIG_G6G7_COM1                         = (int)0x00000040,
 	/** G6,G7 - Quadrature wheel encoder input (G6 QDEC0-A).  Overriden when SPI is enabled (G9 held low on bootup/config). */
-	IO_CONFIG_G6G7_QDEC0_INPUT_G6               = (int)0x00000080,
+//  IO_CONFIG_G6G7_QDEC0_INPUT_G6               = (int)0x00000080,
 	/** G6,G7 - Bit mask */
 	IO_CONFIG_G6G7_MASK                         = (int)0x000000C0,
 	/** G6,G7 - Default */
@@ -2201,8 +2185,10 @@ enum eIoConfig
 	IO_CONFIG_G5G8_STROBE_INPUT_G8              = (int)0x00000200,
 	/** G5,G8 - Strobe input on both G5 and G8 */
 	IO_CONFIG_G5G8_STROBE_INPUT_G5_G8           = (int)0x00000300,
+	/** G5,G8 - Strobe input on both G5 and G8 */
+	IO_CONFIG_G5G8_G6G7_SPI_ENABLE              = (int)0x00000400,
 	/** G5,G8 - Quadrature wheel encoder input (G5 QDEC1-B, G8 QDEC1-A) */
-	IO_CONFIG_G5G8_QDEC_INPUT                   = (int)0x00000400,
+	IO_CONFIG_G5G8_QDEC_INPUT                   = (int)0x00000500,
 	/** G5,G8 - Bit mask */
 	IO_CONFIG_G5G8_MASK                         = (int)0x00000700,
 	/** G5,G8 - Default */
@@ -2287,22 +2273,57 @@ enum eIoConfig
 
 #define IO_CONFIG_DEFAULT 	(IO_CONFIG_G1G2_DEFAULT | IO_CONFIG_G5G8_DEFAULT | IO_CONFIG_G6G7_DEFAULT | IO_CONFIG_G9_DEFAULT | (IO_CONFIG_GPS_SOURCE_ONBOARD_1<<IO_CONFIG_GPS1_SOURCE_OFFSET) | (IO_CONFIG_GPS_SOURCE_ONBOARD_2<<IO_CONFIG_GPS2_SOURCE_OFFSET))
 
-enum eBrdConfig
+enum ePlatformConfig
 {
-	BRD_CONFIG_BITS_MASK						= (int)0x000000FF,
+	// IMX Carrier Board
+	PLATFORM_CFG_TYPE_MASK                      = (int)0x0000000F,
+	PLATFORM_CFG_TYPE_NONE_NO_GPS               = (int)0,
+	PLATFORM_CFG_TYPE_NONE_ONBOARD_G2           = (int)1,
+	PLATFORM_CFG_TYPE_RUG1                      = (int)2,
+	PLATFORM_CFG_TYPE_RUG2_G1                   = (int)3,
+	PLATFORM_CFG_TYPE_RUG2_G2                   = (int)4,
+	PLATFORM_CFG_TYPE_RUG3_G0                   = (int)5,
+	PLATFORM_CFG_TYPE_RUG3_G1                   = (int)6,
+	PLATFORM_CFG_TYPE_RUG3_G2                   = (int)7,
+	PLATFORM_CFG_TYPE_EVB2_G2                   = (int)8,
+	PLATFORM_CFG_TYPE_EVB3                      = (int)9,
+	PLATFORM_CFG_TYPE_IG1_G1                    = (int)10,
+	PLATFORM_CFG_TYPE_IG1_G2                    = (int)11,
+	PLATFORM_CFG_TYPE_LAMBDA_G1                 = (int)12,		// Enable UBX output on Lambda for testbed
+	PLATFORM_CFG_TYPE_TESTBED_G1_W_LAMBDA       = (int)13,		// Enable UBX input from Lambda
+	PLATFORM_CFG_TYPE_COUNT                     = (int)14,
 
-	BRD_CONFIG_BITS_RUG_2_1_n232_485			= (int)0x00000001,
-	BRD_CONFIG_BITS_RUG_2_1_n232_TTL			= (int)0x00000002,
-	BRD_CONFIG_BITS_RUG_2_1_nRS_CAN				= (int)0x00000004,
-	BRD_CONFIG_BITS_RUG_2_1_nGPS2_RS			= (int)0x00000008,
-	BRD_CONFIG_BITS_RUG_2_1_nSPIEN				= (int)0x00000010,
-	BRD_CONFIG_BITS_RUG_2_1_nSPI_SER			= (int)0x00000020,
-	BRD_CONFIG_BITS_RUG_2_1_nGPSRST				= (int)0x00000040,
+	// Presets
+	PLATFORM_CFG_PRESET_MASK                    = (int)0x0000FF00,
+	PLATFORM_CFG_PRESET_OFFSET                  = (int)8,
 
-	BRD_CONFIG_TYPE_NONE						= (int)0x00000000,
-	BRD_CONFIG_TYPE_RUG_2_1 					= (int)0x00000100,
+	// RUG-3 - Presets
+	PLATFORM_CFG_RUG3_PRESET__0__PRESETS_DISABLED								= 0,	// Don't use presets.  IOEXP_BITS can be set directly.
+	PLATFORM_CFG_RUG3_PRESET__1__S0_RS232_7_9___CAN_11_12______S1_GPS1			= 1,
+	PLATFORM_CFG_RUG3_PRESET__2__S0_TTL_7_9_____CAN_11_12______S1_GPS1			= 2,
+	PLATFORM_CFG_RUG3_PRESET__3__S0_TTL_7_9_____S2_TTL_8_10____S1_GPS1			= 3,
+	PLATFORM_CFG_RUG3_PRESET__4__S0_RS232_7_9___S1_RS232_8_10__S2_GPS1			= 4,
+	PLATFORM_CFG_RUG3_PRESET__5__S2_RS485_7_8_9_10_____________S2_GPS1__S0_GPS2	= 5,
+	PLATFORM_CFG_RUG3_PRESET__6__SPI_7_8_9_10__________________S2_GPS1__S0_GPS2	= 6,
+	PLATFORM_CFG_RUG3_PRESET__7__S1_RS232_8_10_________________S2_GPS1__S0_GPS2	= 7,
+	PLATFORM_CFG_RUG3_PRESET__8_________________CAN_11_12______S1_GPS1__S0_GPS2	= 8,
+	PLATFORM_CFG_RUG3_PRESET__9__S2_TTL_8_10___________________S1_GPS1__S0_GPS2	= 9,
+	PLATFORM_CFG_RUG3_PRESET__COUNT												= 10,
 
-	BRD_CONFIG_TYPE_MASK						= (int)0x0000FF00,
+	PLATFORM_CFG_RUG3_PRESET__G0_DEFAULT		= PLATFORM_CFG_RUG3_PRESET__1__S0_RS232_7_9___CAN_11_12______S1_GPS1,
+	PLATFORM_CFG_RUG3_PRESET__G2_DEFAULT		= PLATFORM_CFG_RUG3_PRESET__7__S1_RS232_8_10_________________S2_GPS1__S0_GPS2,
+
+	// RUG-3 - I/O Expander disabled if platform type is != PLATFORM_CFG_TYPE_RUG3_x.
+	PLATFORM_CFG_RUG3_IOEXP_BIT_MASK            = (int)0x00FF0000,
+	PLATFORM_CFG_RUG3_IOEXP_BIT_OFFSET          = (int)16,
+
+	RUG3_IOEXP_BIT_OFFSET_n232_485    			= (int)0,
+	RUG3_IOEXP_BIT_OFFSET_n232_TTL    			= (int)1,
+	RUG3_IOEXP_BIT_OFFSET_nRS_CAN     			= (int)2,
+	RUG3_IOEXP_BIT_OFFSET_nGPS2_RS    			= (int)3,
+	RUG3_IOEXP_BIT_OFFSET_nSPIEN      			= (int)4,
+	RUG3_IOEXP_BIT_OFFSET_nSPI_SER    			= (int)5,
+	RUG3_IOEXP_BIT_OFFSET_nGPSRST     			= (int)6,
 };
 
 /** (DID_WHEEL_ENCODER) Message to communicate wheel encoder measurements to GPS-INS */
@@ -2463,13 +2484,13 @@ typedef struct PACKED
     /** Serial port 1 baud rate in bits per second */
     uint32_t				ser1BaudRate;
 
-    /** Rotation in radians about the X, Y, Z axes from INS Sensor Frame to Intermediate Output Frame.  Order applied: Z, Y, X. */
+    /** Rotation in radians about the X, Y, Z axes from Sensor Frame to Intermediate Output Frame.  Order applied: Z, Y, X. */
     float					insRotation[3];
 
     /** X,Y,Z offset in meters from Intermediate Output Frame to INS Output Frame. */
     float					insOffset[3];
 
-    /** X,Y,Z offset in meters from Sensor Frame origin to GPS 1 antenna. */
+    /** X,Y,Z offset in meters in Sensor Frame to GPS 1 antenna. */
     float					gps1AntOffset[3];
  
     /** INS dynamic platform model (see eInsDynModel).  Options are: 0=PORTABLE, 2=STATIONARY, 3=PEDESTRIAN, 4=GROUND VEHICLE, 5=SEA, 6=AIRBORNE_1G, 7=AIRBORNE_2G, 8=AIRBORNE_4G, 9=WRIST.  Used to balance noise and performance characteristics of the system.  The dynamics selected here must be at least as fast as your system or you experience accuracy error.  This is tied to the GPS position estimation model and intend in the future to be incorporated into the INS position model. */
@@ -2502,8 +2523,8 @@ typedef struct PACKED
     /** Hardware interface configuration bits (see eIoConfig). */
     uint32_t				ioConfig;
 
-    /** Carrier board (i.e. eval board) configuration bits */
-    uint32_t				cBrdConfig;
+    /** Hardware platform (IMX carrier board, i.e. RUG, EVB, IG) configuration bits (see ePlatformConfig) */
+    uint32_t				platformConfig;
 
     /** X,Y,Z offset in meters from DOD_ Frame origin to GPS 2 antenna. */
     float					gps2AntOffset[3];
@@ -2543,25 +2564,25 @@ typedef struct PACKED
 
 } nvm_flash_cfg_t;
 
-/** INL2 - Estimate error variances */
+/** (DID_INL2_NED_SIGMA) Standard deviation of INL2 EKF estimates in the NED frame. */
 typedef struct PACKED
 {											
     /** Timestamp in milliseconds */
 	unsigned int			timeOfWeekMs;	
     /** NED position error sigma */
-	float					PxyzNED[3];		
+	float					StdPosNed[3];		
     /** NED velocity error sigma */
-	float					PvelNED[3];		
+	float					StdVelNed[3];		
     /** NED attitude error sigma */
-	float					PattNED[3];		
+	float					StdAttNed[3];		
     /** Acceleration bias error sigma */
-	float					PABias[3];		
+	float					StdAccBias[3];		
     /** Angular rate bias error sigma */
-	float					PWBias[3];		
+	float					StdGyrBias[3];		
     /** Barometric altitude bias error sigma */
-	float					PBaroBias;		
+	float					StdBarBias;		
     /** Mag declination error sigma */
-	float					PDeclination;	
+	float					StdMagDeclination;	
 } inl2_ned_sigma_t;
 
 /** (DID_STROBE_IN_TIME) Timestamp for input strobe. */
@@ -3409,6 +3430,44 @@ typedef struct PACKED
     uGpsRawData data;
 } gps_raw_t;
 
+// (DID_GPS1_TIMEPULSE)
+typedef struct
+{
+	/*! (s)	Week seconds offset from MCU to GPS time. */
+	double		towOffset;			
+
+	/*! (s)	Week seconds for next timepulse (from start of GPS week) */
+	double		towGps;				
+
+	/*! (s)	Local MCU week seconds */
+	double		timeMcu;			
+
+	/*! (ms) Local timestamp of TIM-TP message used to validate timepulse. */
+	uint32_t	msgTimeMs;			
+
+	/*! (ms) Local timestamp of time sync pulse external interrupt used to validate timepulse. */
+	uint32_t	plsTimeMs;			
+
+	/*! Counter for successful timesync events. */
+	uint8_t		syncCount;			
+
+	/*! Counter for failed timesync events. */
+	uint8_t		badPulseAgeCount;			
+
+	/*! Counter for GPS PPS interrupt re-initalization. */
+	uint8_t		ppsInterruptReinitCount;
+
+	/*! */
+	uint8_t		unused;			
+
+	/*! (ms) Local timestamp of last valid PPS sync. */
+	uint32_t	lastSyncTimeMs;		
+
+	/*! (ms) Time since last valid PPS sync. */
+	uint32_t 	sinceLastSyncTimeMs;
+
+} gps_timepulse_t;
+
 /**
 * Diagnostic message
 */
@@ -3940,6 +3999,10 @@ typedef struct PACKED
 
 	/** Handle */
 	uint32_t                handle;
+
+	/** Local time when task loop started (following delay) */
+	uint32_t                profileStartTimeUs;
+	
 } rtos_task_t;
 
 /** (DID_RTOS_INFO) */
@@ -4211,7 +4274,7 @@ Gets the offsets and lengths of strings given a data id
 uint16_t* getStringOffsetsLengths(eDataIDs dataId, uint16_t* offsetsLength);
 
 /** Convert DID to realtime message bits */
-uint64_t didToRmcBit(uint32_t dataId, uint64_t defaultRmcBits);
+uint64_t didToRmcBit(uint32_t dataId, uint64_t defaultRmcBits, uint64_t devInfoRmcBits);
 
 //Time conversion constants
 #define SECONDS_PER_WEEK        604800

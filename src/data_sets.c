@@ -185,6 +185,14 @@ uint16_t* getDoubleOffsets(eDataIDs dataId, uint16_t* offsetsLength)
 		offsetof(ins_4_t, ecef[2])
 	};
 
+	static uint16_t offsetsGpsTimepulse[] =
+	{
+		3,
+		offsetof(gps_timepulse_t, towOffset),
+		offsetof(gps_timepulse_t, towGps),
+		offsetof(gps_timepulse_t, timeMcu)
+	};
+
 	static uint16_t offsetsSysParams[] =
 	{
 		1,
@@ -193,14 +201,14 @@ uint16_t* getDoubleOffsets(eDataIDs dataId, uint16_t* offsetsLength)
 
     static uint16_t offsetsPreImuMag[] =
     {
-        3,
+        2,
         offsetof(pimu_mag_t, pimu.time),
         offsetof(pimu_mag_t, mag.time)
     };
 
     static uint16_t offsetsImuMag[] =
     {
-        3,
+        2,
         offsetof(imu_mag_t, imu.time),
         offsetof(imu_mag_t, mag.time)
     };
@@ -300,8 +308,8 @@ uint16_t* getDoubleOffsets(eDataIDs dataId, uint16_t* offsetsLength)
 		0,						// 37: DID_NVR_MANAGE_PROTECTED
 		0,						// 38: DID_RTOS_INFO
 		offsetsDebugArray,		// 39: DID_DEBUG_ARRAY
-		0,						// 40: DID_SENSORS_CAL1
-		0,						// 41: DID_SENSORS_CAL2
+		0,						// 40: DID_SENSORS_MCAL
+		offsetsGpsTimepulse,	// 41: DID_GPS1_TIMEPULSE
 		0,						// 42: DID_CAL_SC
 		0,						// 43: DID_CAL_SC1
 		0,						// 44: DID_CAL_SC2
@@ -478,8 +486,8 @@ uint16_t* getStringOffsetsLengths(eDataIDs dataId, uint16_t* offsetsLength)
 		debugStringOffsets,		// 37: DID_DEBUG_STRING
 		rtosTaskOffsets,		// 38: DID_RTOS_INFO
 		0,						// 39: DID_DEBUG_ARRAY
-		0,						// 40: DID_SENSORS_CAL1
-		0,						// 41: DID_SENSORS_CAL2
+		0,						// 40: DID_SENSORS_MCAL
+		0,						// 41: 
 		0,						// 42: DID_CAL_SC
 		0,						// 43: DID_CAL_SC1
 		0,						// 44: DID_CAL_SC2
@@ -606,7 +614,7 @@ uint32_t flashChecksum32(const void* data, int size)
 }
 
 // Convert DID to message out control mask
-uint64_t didToRmcBit(uint32_t dataId, uint64_t defaultRmcBits)
+uint64_t didToRmcBit(uint32_t dataId, uint64_t defaultRmcBits, uint64_t devInfoRmcBits)
 {
 	switch (dataId)
 	{
@@ -648,6 +656,8 @@ uint64_t didToRmcBit(uint32_t dataId, uint64_t defaultRmcBits)
 		case DID_GROUND_VEHICLE:        return RMC_BITS_GROUND_VEHICLE;
 		case DID_IMU_MAG:               return RMC_BITS_IMU_MAG;
 		case DID_PIMU_MAG: 				return RMC_BITS_PIMU_MAG;
+		
+		case DID_DEV_INFO:				return devInfoRmcBits;		// This allows the dev info to respond instantly when first connected.
 		default:                        return defaultRmcBits;
 	}
 }

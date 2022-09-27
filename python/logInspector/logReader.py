@@ -52,7 +52,8 @@ class Log:
         self.numRef = 0
 
         if self.numDev == 0:
-            raise ValueError("No devices found in log")
+            print("No devices found in log or no logs found!!!")
+            return False
         if len(self.data[0, DID_DEV_INFO]):
             self.serials = [self.data[d, DID_DEV_INFO]['serialNumber'][0] for d in range(self.numDev)]
 
@@ -66,6 +67,10 @@ class Log:
                     self.refSerials.append(self.data[i, DID_DEV_INFO]['serialNumber'][0])
             else:
                 self.devIdx.append(i)
+            if self.serials[i] == 10101:
+                self.serials[i] = 'NovAtel INS'
+            if len(self.data[0, DID_INS_2]) == 0 and len(self.data[0, DID_INS_1]) != 0:
+                self.ins1ToIns2(i)
 
         if len(self.serials) == len(self.refSerials):
             self.devIdx = self.refIdx
@@ -92,12 +97,16 @@ class Log:
             self.navMode = (self.data[0, DID_INS_2]['insStatus'][-1] & 0x1000) == 0x1000
         # except:
             # print(RED + "error loading log" + sys.exc_info()[0] + RESET)
+        return True
 
     def getSerialNumbers(self):
         return self.c_log.getSerialNumbers()
 
     def protocolVersion(self):
         return self.c_log.protocolVersion()
+
+    def ins1ToIns2(self, device_id=0):
+        self.c_log.ins1ToIns2(device_id)
 
     def exitHack(self, exit_code=0):
         self.c_log.exitHack(exit_code)
@@ -335,7 +344,7 @@ class Log:
                 thresholds[0] = 1.0
                 thresholds[1] = 1.0
                 thresholds[2] = 1.0
-        # Thresholds for uINS-5
+        # Thresholds for IMX-5
         elif hardware == 5:
             thresholds = np.array([0.35, 0.35, 0.8,  # (m)   NED
                                    0.2, 0.2, 0.2,    # (m/s) UVW
@@ -538,10 +547,9 @@ if __name__ == '__main__':
         serials = ["ALL"]
 
     log = Log()
-    log.load(directory)
-
-    # Compute and output RMS Report
-    log.calculateRMS()
-    # log.debugPlot()
-    log.printRMSReport()
-    log.openRMSReport()
+    if log.load(directory):
+        # Compute and output RMS Report
+        log.calculateRMS()
+        # log.debugPlot()
+        log.printRMSReport()
+        log.openRMSReport()

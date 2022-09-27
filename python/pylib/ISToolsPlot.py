@@ -732,47 +732,47 @@ def IsLoggerPlot( pe, log, tru=None, startFigure=None, referencePlot=False, save
         f += 1;    legend = []
         fig, ax = pt.subplots(f,3, 'Variance', sharex=True)
         pt.labels('INL2 Position Variance')
-        pt.subplotSingle(ax[0],varInfo.v['towMs'], varInfo.v['PxyxNED'][:,0] , 'INS Px N (NED)' )
-        pt.subplotSingle(ax[1],varInfo.v['towMs'], varInfo.v['PxyxNED'][:,1] , 'INS Py E (NED)' )
-        pt.subplotSingle(ax[2],varInfo.v['towMs'], varInfo.v['PxyxNED'][:,2] , 'INS Pz D (NED)' )
+        pt.subplotSingle(ax[0],varInfo.v['towMs'], varInfo.v['StdPosNed'][:,0] , 'INS Px N (NED)' )
+        pt.subplotSingle(ax[1],varInfo.v['towMs'], varInfo.v['StdPosNed'][:,1] , 'INS Py E (NED)' )
+        pt.subplotSingle(ax[2],varInfo.v['towMs'], varInfo.v['StdPosNed'][:,2] , 'INS Pz D (NED)' )
 
         f += 1;    legend = []
         fig, ax = pt.subplots(f,3, 'Vel Variance', sharex=True)
         pt.labels('INL2 Velocity Variance')
-        pt.subplotSingle(ax[0],varInfo.v['towMs'], varInfo.v['PvelNED'][:,0] , 'INS Pvx N (NED)' )
-        pt.subplotSingle(ax[1],varInfo.v['towMs'], varInfo.v['PvelNED'][:,1] , 'INS Pvy E (NED)' )
-        pt.subplotSingle(ax[2],varInfo.v['towMs'], varInfo.v['PvelNED'][:,2] , 'INS Pvz D (NED)' )
+        pt.subplotSingle(ax[0],varInfo.v['towMs'], varInfo.v['StdVelNed'][:,0] , 'INS Pvx N (NED)' )
+        pt.subplotSingle(ax[1],varInfo.v['towMs'], varInfo.v['StdVelNed'][:,1] , 'INS Pvy E (NED)' )
+        pt.subplotSingle(ax[2],varInfo.v['towMs'], varInfo.v['StdVelNed'][:,2] , 'INS Pvz D (NED)' )
 
         f += 1;    legend = []
         fig, ax = pt.subplots(f,3, 'Att Variance', sharex=True)
         pt.labels('INL2 Attitude Variance')
-        pt.subplotSingle(ax[0],varInfo.v['towMs'], varInfo.v['PattNED'][:,0] , 'INS Pwx (NED)' )
-        pt.subplotSingle(ax[1],varInfo.v['towMs'], varInfo.v['PattNED'][:,1] , 'INS Pwy (NED)' )
-        pt.subplotSingle(ax[2],varInfo.v['towMs'], varInfo.v['PattNED'][:,2] , 'INS Pwz (NED)' )
+        pt.subplotSingle(ax[0],varInfo.v['towMs'], varInfo.v['StdAttNed'][:,0] , 'INS Pwx (NED)' )
+        pt.subplotSingle(ax[1],varInfo.v['towMs'], varInfo.v['StdAttNed'][:,1] , 'INS Pwy (NED)' )
+        pt.subplotSingle(ax[2],varInfo.v['towMs'], varInfo.v['StdAttNed'][:,2] , 'INS Pwz (NED)' )
 
         f += 1;    legend = []
         fig, ax = pt.subplots(f,3, 'A Bias Variance', sharex=True)
         pt.labels('INL2 A Bias Variance')
-        pt.subplotSingle(ax[0],varInfo.v['towMs'], varInfo.v['PABias'][:,0] , 'INS PA Bias x' )
-        pt.subplotSingle(ax[1],varInfo.v['towMs'], varInfo.v['PABias'][:,1] , 'INS PA Bias y' )
-        pt.subplotSingle(ax[2],varInfo.v['towMs'], varInfo.v['PABias'][:,2] , 'INS PA Bias z' )
+        pt.subplotSingle(ax[0],varInfo.v['towMs'], varInfo.v['StdAccBias'][:,0] , 'INS PA Bias x' )
+        pt.subplotSingle(ax[1],varInfo.v['towMs'], varInfo.v['StdAccBias'][:,1] , 'INS PA Bias y' )
+        pt.subplotSingle(ax[2],varInfo.v['towMs'], varInfo.v['StdAccBias'][:,2] , 'INS PA Bias z' )
 
         f += 1;    legend = []
         fig, ax = pt.subplots(f,3, 'W Bias Variance', sharex=True)
         pt.labels('INL2 W Bias Variance')
-        pt.subplotSingle(ax[0],varInfo.v['towMs'], varInfo.v['PWBias'][:,0] , 'INS PW Bias x' )
-        pt.subplotSingle(ax[1],varInfo.v['towMs'], varInfo.v['PWBias'][:,1] , 'INS PW Bias y' )
-        pt.subplotSingle(ax[2],varInfo.v['towMs'], varInfo.v['PWBias'][:,2] , 'INS PW Bias z' )
+        pt.subplotSingle(ax[0],varInfo.v['towMs'], varInfo.v['StdGyrBias'][:,0] , 'INS PW Bias x' )
+        pt.subplotSingle(ax[1],varInfo.v['towMs'], varInfo.v['StdGyrBias'][:,1] , 'INS PW Bias y' )
+        pt.subplotSingle(ax[2],varInfo.v['towMs'], varInfo.v['StdGyrBias'][:,2] , 'INS PW Bias z' )
 
         f += 1;    legend = []
         fig, ax = pt.subplots(f,1, 'Baro Bias Variance', sharex=True)
         pt.labels('INL2 Baro Bias Variance')
-        pt.subplotSingle(ax,varInfo.v['towMs'], varInfo.v['PBaroBias'] , 'Baro Bias' )
+        pt.subplotSingle(ax,varInfo.v['towMs'], varInfo.v['StdBarBias'] , 'Baro Bias' )
 
         f += 1;    legend = []
         fig, ax = pt.subplots(f,1, 'Declination Variance', sharex=True)
         pt.labels('INL2 Declination Variance')
-        pt.subplotSingle(ax,varInfo.v['towMs'], varInfo.v['PDeclination'] , 'Declination' )
+        pt.subplotSingle(ax,varInfo.v['towMs'], varInfo.v['StdMagDeclination'] , 'Declination' )
 
 
         #############################################
@@ -1352,8 +1352,8 @@ def IsLoggerPlot( pe, log, tru=None, startFigure=None, referencePlot=False, save
         mpu = []
         mpu.append(cObj())
         mpu.append(cObj())
-        mpu[0].temp = log.data['sensorsRaw']['mpu'][:,0]['temp']
-        mpu[1].temp = log.data['sensorsRaw']['mpu'][:,1]['temp']
+        mpu[0].temp = log.data['sensorsUcal']['mpu'][:,0]['temp']
+        mpu[1].temp = log.data['sensorsUcal']['mpu'][:,1]['temp']
         dt = 0.004
         mpuTime = np.arange(0.0, np.shape(mpu[0].temp)[0])*dt
 
@@ -1362,8 +1362,8 @@ def IsLoggerPlot( pe, log, tru=None, startFigure=None, referencePlot=False, save
         if peCheck('sensorIs1PqrVsTemp'):
             f += 1;    legend = []
             pt.labels('SensorsIS1: PQR vs Temperature','deg/s')
-            mpu[0].pqr  = log.data['sensorsRaw']['mpu'][:,0]['pqr']
-            mpu[1].pqr  = log.data['sensorsRaw']['mpu'][:,1]['pqr']
+            mpu[0].pqr  = log.data['sensorsUcal']['mpu'][:,0]['pqr']
+            mpu[1].pqr  = log.data['sensorsUcal']['mpu'][:,1]['pqr']
             if pe['sensorIs1PqrVsTemp'] != 1:
                 freq = pe['sensorIs1PqrVsTemp']
                 mpu[0].pqr = ft.lpfNoDelay(mpu[0].pqr, freq, dt=dt)
@@ -1374,8 +1374,8 @@ def IsLoggerPlot( pe, log, tru=None, startFigure=None, referencePlot=False, save
             plt.legend(legend)
 
         if peCheck('sensorIs1Pqr'):
-            mpu[0].pqr  = log.data['sensorsRaw']['mpu'][:,0]['pqr']
-            mpu[1].pqr  = log.data['sensorsRaw']['mpu'][:,1]['pqr']
+            mpu[0].pqr  = log.data['sensorsUcal']['mpu'][:,0]['pqr']
+            mpu[1].pqr  = log.data['sensorsUcal']['mpu'][:,1]['pqr']
             if pe['sensorIs1Pqr'] != 1:
                 freq = pe['sensorIs1Pqr']
                 mpu[0].pqr = ft.lpfNoDelay(mpu[0].pqr, freq, dt=dt)
@@ -1397,8 +1397,8 @@ def IsLoggerPlot( pe, log, tru=None, startFigure=None, referencePlot=False, save
         if peCheck('sensorIs1AccVsTemp'):
             f += 1;    legend = []
             pt.labels('SensorsIS1: Accel vs Temperature','m/s^2')
-            mpu[0].acc  = log.data['sensorsRaw']['mpu'][:,0]['acc']
-            mpu[1].acc  = log.data['sensorsRaw']['mpu'][:,1]['acc']
+            mpu[0].acc  = log.data['sensorsUcal']['mpu'][:,0]['acc']
+            mpu[1].acc  = log.data['sensorsUcal']['mpu'][:,1]['acc']
             if pe['sensorIs1AccVsTemp'] != 1:
                 freq = pe['sensorIs1AccVsTemp']
                 mpu[0].acc = ft.lpfNoDelay(mpu[0].acc, freq, dt=dt)
@@ -1409,8 +1409,8 @@ def IsLoggerPlot( pe, log, tru=None, startFigure=None, referencePlot=False, save
             plt.legend(legend)
 
         if peCheck('sensorIs1Acc'):
-            mpu[0].acc  = log.data['sensorsRaw']['mpu'][:,0]['acc']
-            mpu[1].acc  = log.data['sensorsRaw']['mpu'][:,1]['acc']
+            mpu[0].acc  = log.data['sensorsUcal']['mpu'][:,0]['acc']
+            mpu[1].acc  = log.data['sensorsUcal']['mpu'][:,1]['acc']
             if pe['sensorIs1Acc'] != 1:
                 freq = pe['sensorIs1Acc']
                 mpu[0].acc = ft.lpfNoDelay(mpu[0].acc, freq, dt=dt)
@@ -1433,8 +1433,8 @@ def IsLoggerPlot( pe, log, tru=None, startFigure=None, referencePlot=False, save
             f += 1;    legend = []
             pt.labels('SensorsIS1: Mag vs Temperature','gauss')
             lgd = ['mpu1','mpu2']
-            mpu[0].mag  = log.data['sensorsRaw']['mpu'][:,0]['mag']
-            mpu[1].mag  = log.data['sensorsRaw']['mpu'][:,1]['mag']
+            mpu[0].mag  = log.data['sensorsUcal']['mpu'][:,0]['mag']
+            mpu[1].mag  = log.data['sensorsUcal']['mpu'][:,1]['mag']
             if pe['sensorIs1Mag'] != 1:
                 freq = pe['sensorMag']
                 mpu[0].mag = ft.smooth(mpu[0].mag, pe['sensorIs1Mag'])

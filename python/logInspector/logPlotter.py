@@ -241,7 +241,11 @@ class logPlot:
 
             if np.shape(self.active_devs)[0] == 1:  # Show GPS if #devs is 1
                 timeGPS = getTimeFromTowMs(self.getData(d, DID_GPS1_VEL, 'timeOfWeekMs'))
-                gpsVelEcef = self.getData(d, DID_GPS1_VEL, 'velEcef')
+                status = self.getData(d, DID_GPS1_VEL, 'status')[0]
+                if (status & 0x00008000):
+                    gpsVelNed = self.getData(d, DID_GPS1_VEL, 'vel')    # NED velocity
+                else:
+                    gpsVelEcef = self.getData(d, DID_GPS1_VEL, 'vel')   # ECEF velocity
                 qe2n = quat_ecef2ned(self.getData(d, DID_GPS1_POS, 'lla')[0,0:2]*np.pi/180.0)
                 if len(gpsVelEcef) > 0:
                     gpsVelNed = quatConjRot(qe2n, gpsVelEcef)
@@ -1945,6 +1949,7 @@ class logPlot:
                 refImu = refImu
                 refVal = refImu[name]
 
+            print("Serial#: SN" + str(self.log.serials[d]) + " " + name + ": ")
             for i in range(3):
                 temp = imu[:,i]['lpfTemp']
                 sensor = imu[:,i]['lpfLsb']
@@ -1970,6 +1975,21 @@ class logPlot:
                 ax[2,i].plot(x, sensor[:,2]*scalar)
                 if name=='acc':
                     ax[3,i].plot(x, np.linalg.norm(sensor, axis=1)*scalar)
+
+                # Print mean and last value
+                xstr = "IMU" + str(i) + ", Mean: ["
+                for j in range(3):
+                    xstr += format(np.mean(sensor[:,j])*scalar, '10.6f')
+                    if j < 2:
+                        xstr += ","
+                xstr += "],  "
+                xstr += "Last: ["
+                for j in range(3):
+                    xstr += format(sensor[-1,j]*scalar, '10.6f')
+                    if j < 2:
+                        xstr += ","
+                xstr += "]"
+                print(xstr)
 
                 # Show sensor valid status bit
                 if name=='acc':

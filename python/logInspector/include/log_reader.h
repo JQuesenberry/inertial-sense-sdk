@@ -54,8 +54,9 @@ struct DeviceLog
     std::vector<gps_rtk_misc_t> gps1RtkPosMisc;
     std::vector<gps_rtk_misc_t> gps1RtkCmpMisc;
     // std::vector<feature_bits_t> featureBits;
-    std::vector<sensors_w_temp_t> sensorsRaw;
+    std::vector<sensors_w_temp_t> sensorsUcal;
     std::vector<sensors_w_temp_t> sensorsTcal;
+    std::vector<sensors_w_temp_t> sensorsMcal;
     std::vector<sensors_t> sensorsTcBias;
     std::vector<io_t> io;
     // std::vector<sys_sensors_adc_t> sensorsAdc;
@@ -73,8 +74,6 @@ struct DeviceLog
     // std::vector<rtos_info_t> rtosInfo;
     std::vector<debug_string_t> debugString;
     std::vector<debug_array_t> debugArray;
-    std::vector<sensors_mpu_w_temp_t> sensorsCal1;
-    std::vector<sensors_mpu_w_temp_t> sensorsCal2;
     // std::vector<sensor_cal_v1p2_t> calSc;
     // std::vector<sensor_cal_mpu_t> calSc1;
     // std::vector<sensor_cal_mpu_t> calSc2;
@@ -136,10 +135,11 @@ public:
     bool load();
     pybind11::list getSerialNumbers();
     pybind11::list protocolVersion();
+    void ins1ToIns2(int device_id=0);
     void exitHack(int exit_code=0);
     
     template <typename T>
-    void forward_message(eDataIDs did, std::vector<T>& vec, int id);
+    void forward_message(eDataIDs did, std::vector<T>& vec, int device_id);
 
     template <typename T>
     void log_message(int did, uint8_t* msg, std::vector<T>& vec)
@@ -149,7 +149,7 @@ public:
 
 private:
     void organizeData(int device_id);
-    void forwardData(int id);
+    void forwardData(int device_id);
 
     cISLogger logger_;
     DeviceLog* dev_log_ = nullptr;
