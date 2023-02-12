@@ -1260,7 +1260,6 @@ enum eSystemCommand
     SYS_CMD_MANF_UNLOCK                             = 1122334455,
     SYS_CMD_MANF_FACTORY_RESET                      = 1357924680,	// SYS_CMD_MANF_RESET_UNLOCK must be sent prior to this command.
     SYS_CMD_MANF_CHIP_ERASE                         = 1357924681,	// SYS_CMD_MANF_RESET_UNLOCK must be sent prior to this command.
-    SYS_CMD_MANF_DOWNGRADE_CALIBRATION              = 1357924682,	// SYS_CMD_MANF_RESET_UNLOCK must be sent prior to this command.
 };
 
 enum eSerialPortBridge
