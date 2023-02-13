@@ -79,20 +79,13 @@ extern "C" {
 #define CPU_IS_LITTLE_ENDIAN (__BYTE_ORDER == __LITTLE_ENDIAN)
 #define CPU_IS_BIG_ENDIAN (__BYTE_ORDER == __BIG_ENDIAN)
 
-#elif defined(__INERTIAL_SENSE_EVB_2__)
-#define PLATFORM_IS_EMBEDDED 1
-#define PLATFORM_IS_ARM 1
-#define PLATFORM_IS_EVB_2 1
-#define CPU_IS_LITTLE_ENDIAN 1
-#define CPU_IS_BIG_ENDIAN 0
-
 #elif defined(ARM) || defined(__SAM3X8E__)
 #define PLATFORM_IS_EMBEDDED 1
 #define PLATFORM_IS_ARM 1
 #define CPU_IS_LITTLE_ENDIAN 1
 #define CPU_IS_BIG_ENDIAN 0
 
-#elif defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__) || defined(__AVR_ATmega168__) ||defined(__AVR_ATmega168P__) ||defined(__AVR_ATmega328P__)
+#elif defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__) || defined(__AVR_ATmega168__) || defined(__AVR_ATmega168P__) || defined(__AVR_ATmega328P__)
 #define PLATFORM_IS_EMBEDDED 1
 #define PLATFORM_IS_ARM 0
 #define CPU_IS_LITTLE_ENDIAN 1

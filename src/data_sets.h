@@ -2275,7 +2275,7 @@ enum eIoConfig
     IO_CFG_GPS_TIMEPUSE_SOURCE_STROBE_G9_PIN13	= (int)6,
 #define SET_STATUS_OFFSET_MASK(result,val,offset,mask)	{ (result) &= ~((mask)<<(offset)); (result) |= ((val)<<(offset)); }
     
-#define IO_CFG_GPS_TIMEPUSE_SOURCE(ioConfig) ((ioConfig>>IO_CFG_GPS_TIMEPUSE_SOURCE_OFFSET)&IO_CFG_GPS_TIMEPUSE_SOURCE_MASK)
+#define IO_CFG_GPS_TIMEPULSE_SOURCE(ioConfig) ((ioConfig>>IO_CFG_GPS_TIMEPUSE_SOURCE_OFFSET)&IO_CFG_GPS_TIMEPUSE_SOURCE_MASK)
     
     /** GPS 1 source OFFSET */
     IO_CONFIG_GPS1_SOURCE_OFFSET				= (int)16,				// ioConfig[18-16]
