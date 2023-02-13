@@ -2692,7 +2692,7 @@ POP_PACK
 
 PUSH_PACK_8
 
-#ifndef GPX_1
+#ifndef GPX_1_0
 
 /** time struct */
 typedef struct
@@ -2801,7 +2801,7 @@ POP_PACK
 
 PUSH_PACK_1
 
-#ifndef GPX_1
+#ifndef GPX_1_0
 
 /** (DID_GPS_RTK_OPT) RTK processing options */
 typedef struct
@@ -3462,7 +3462,7 @@ typedef enum
 
 typedef union PACKED
 {   
-#ifndef GPX_1
+#ifndef GPX_1_0
     /** Satellite observation data */
     obsd_t              obs[MAX_OBSERVATION_COUNT_IN_RTK_MESSAGE];
     
@@ -4407,7 +4407,7 @@ void julianToDate(double julian, int32_t* year, int32_t* month, int32_t* day, in
 double gpsToJulian(int32_t gpsWeek, int32_t gpsMilliseconds, int32_t leapSeconds);
 
 
-#ifndef GPX_1
+#ifndef GPX_1_0
 
 #ifndef RTKLIB_H
 #define SYS_NONE    0x00                /* navigation system: none */
