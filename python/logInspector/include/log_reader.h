@@ -72,9 +72,6 @@ struct DeviceLog
     // std::vector<rtos_info_t> rtosInfo;
     std::vector<debug_string_t> debugString;
     std::vector<debug_array_t> debugArray;
-    // std::vector<sensor_cal_v1p2_t> calSc;
-    // std::vector<sensor_cal_mpu_t> calSc1;
-    // std::vector<sensor_cal_mpu_t> calSc2;
     std::vector<sys_sensors_adc_t> sensorsAdcSigma;
     std::vector<inl2_states_t> inl2States;
     std::vector<inl2_status_t> inl2Status;
