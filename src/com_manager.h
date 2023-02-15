@@ -563,13 +563,6 @@ Get user defined data to from a com manager instance
 */
 void* comManagerGetUserPointer(CMHANDLE cmInstance);
 
-/**
-* Ensure baudrate is valid for InertialSense hardware
-* @param baudRate the baud rate to check
-* @return 0 if baud rate is valid, -1 if not
-*/
-int comManagerValidateBaudRate(unsigned int baudRate);
-
 #ifdef __cplusplus
 }
 #endif

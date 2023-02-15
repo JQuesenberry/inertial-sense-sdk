@@ -866,7 +866,7 @@ bool InertialSense::OpenSerialPorts(const char* port, int baudRate)
 {
 	CloseSerialPorts();
 
-	if (port == NULLPTR || comManagerValidateBaudRate(baudRate) != 0)
+	if (port == NULLPTR || validateBaudRate(baudRate) != 0)
 	{
 		return false;
 	}

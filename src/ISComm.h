@@ -698,8 +698,6 @@ void is_enable_packet_encoding(int enabled); // default is enabled
 unsigned int calculate24BitCRCQ(unsigned char* buffer, unsigned int len);
 unsigned int getBitsAsUInt32(const unsigned char* buffer, unsigned int pos, unsigned int len);
 
-int validateBaudRate(unsigned int baudRate);
-
 /** Copies data structure into packet data.  Data copied is limited to the size and offset specified in p_data_t *data.  Returns 0 on success, -1 on failure. */
 char copyStructPToDataP(p_data_t *data, const void *sptr, const unsigned int maxsize);
 

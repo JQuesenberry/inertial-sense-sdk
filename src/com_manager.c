@@ -1636,10 +1636,3 @@ void updatePacketRetryAck(com_manager_t* cmInstance, packet_t *pkt)
 		cmInstance->ensuredPackets[i].counter = -2;         // Indicate no more retries in list
 	}
 }
-
-int comManagerValidateBaudRate(unsigned int baudRate)
-{
-	// Valid baudrates for InertialSense hardware
-	return validateBaudRate(baudRate);
-}
-
