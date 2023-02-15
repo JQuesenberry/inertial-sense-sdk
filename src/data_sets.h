@@ -4349,16 +4349,8 @@ void flipStrings(uint8_t* data, int dataLength, int offset, uint16_t* offsets, u
 
 // BE_SWAP: if big endian then swap, else no-op
 // LE_SWAP: if little endian then swap, else no-op
-#if CPU_IS_BIG_ENDIAN
-#define BE_SWAP64F(_i) flipDoubleCopy(_i)
-#define BE_SWAP32F(_i) flipFloatCopy(_i)
-#define BE_SWAP32(_i) (SWAP32(_i))
-#define BE_SWAP16(_i) (SWAP16(_i))
-#define LE_SWAP64F(_i) (_i)
-#define LE_SWAP32F(_i) (_i)
-#define LE_SWAP32(_i) (_i)
-#define LE_SWAP16(_i) (_i)
-#else // little endian
+
+#if CPU_IS_LITTLE_ENDIAN // little endian
 #define BE_SWAP64F(_i) (_i)
 #define BE_SWAP32F(_i) (_i)
 #define BE_SWAP32(_i) (_i)
@@ -4367,6 +4359,15 @@ void flipStrings(uint8_t* data, int dataLength, int offset, uint16_t* offsets, u
 #define LE_SWAP32F(_i) flipFloatCopy(_i)
 #define LE_SWAP32(_i) (SWAP32(_i))
 #define LE_SWAP16(_i) (SWAP16(_i))
+#else
+#define BE_SWAP64F(_i) flipDoubleCopy(_i)
+#define BE_SWAP32F(_i) flipFloatCopy(_i)
+#define BE_SWAP32(_i) (SWAP32(_i))
+#define BE_SWAP16(_i) (SWAP16(_i))
+#define LE_SWAP64F(_i) (_i)
+#define LE_SWAP32F(_i) (_i)
+#define LE_SWAP32(_i) (_i)
+#define LE_SWAP16(_i) (_i)
 #endif
 
 /**

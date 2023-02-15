@@ -30,7 +30,24 @@ extern "C" {
 
 #define ECEF2LLA_METHOD 5  // Method to compute LLA from ECEF position (0 through 5)
 
-#if defined(WIN32) || defined(__WIN32__) || defined(_WIN32)
+// Check for embedded platform first, then for Win32, Apple, Linux
+
+#if defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__) || defined(__AVR_ATmega168__) || defined(__AVR_ATmega168P__) || defined(__AVR_ATmega328P__)    // Arduino AVR
+
+#define PLATFORM_IS_EMBEDDED 1
+#define CPU_IS_LITTLE_ENDIAN 1
+
+#elif defined(__MK20DX128__) || defined(__MK20DX256__) || defined(__MK64FX512__) || defined(__MK66FX1M0__)  // Teensy 3.0, 3.1, 3.5, 3.6
+
+#define PLATFORM_IS_EMBEDDED 1
+#define CPU_IS_LITTLE_ENDIAN 1
+
+#elif defined(ARM_EMBEDDED) || defined(__SAM3X8E__)
+
+#define PLATFORM_IS_EMBEDDED 1
+#define CPU_IS_LITTLE_ENDIAN 1
+
+#elif defined(WIN32) || defined(__WIN32__) || defined(_WIN32)
 
 #define PLATFORM_IS_WINDOWS 1
 #define PLATFORM_IS_EMBEDDED 0
@@ -45,9 +62,18 @@ extern "C" {
 #include <windows.h>
 #define socket_t SOCKET
 
-#define CPU_IS_LITTLE_ENDIAN (REG_DWORD == REG_DWORD_LITTLE_ENDIAN)
-#define CPU_IS_BIG_ENDIAN (REG_DWORD == REG_DWORD_BIG_ENDIAN)
-#define S_ISREG(m) (((m) & S_IFMT) == S_IFREG)
+#ifndef __BYTE_ORDER
+#error REG_DWORD not defined, must be REG_DWORD_LITTLE_ENDIAN or REG_DWORD_BIG_ENDIAN
+#endif
+
+#if (REG_DWORD == REG_DWORD_LITTLE_ENDIAN)
+#define CPU_IS_LITTLE_ENDIAN 1
+#elif (REG_DWORD == REG_DWORD_BIG_ENDIAN)
+#define CPU_IS_LITTLE_ENDIAN 0
+#else
+#error "Windows CPU endianness not defined"
+#endif
+
 #define S_ISDIR(m) (((m) & S_IFMT) == S_IFDIR)
 
 #elif defined(__APPLE__)
@@ -59,66 +85,46 @@ extern "C" {
 
 #if defined(__LITTLE_ENDIAN__)
 #define CPU_IS_LITTLE_ENDIAN 1
-#define CPU_IS_BIG_ENDIAN 0
 #elif defined(__BIG_ENDIAN__)
 #define CPU_IS_LITTLE_ENDIAN 0
-#define CPU_IS_BIG_ENDIAN 1
+#else
+#error "Apple CPU endianness not defined"
 #endif
 
 #elif defined(__linux__) || defined(__unix__) || defined(__CYGWIN__)
 
 #include <endian.h>
 
+#define PLATFORM_IS_LINUX 1
+#define PLATFORM_IS_EMBEDDED 0
+#define socket_t int
+
 #ifndef __BYTE_ORDER
 #error __BYTE_ORDER not defined, must be __LITTLE_ENDIAN or __BIG_ENDIAN
 #endif
 
-#define PLATFORM_IS_LINUX 1
-#define PLATFORM_IS_EMBEDDED 0
-#define socket_t int
-#define CPU_IS_LITTLE_ENDIAN (__BYTE_ORDER == __LITTLE_ENDIAN)
-#define CPU_IS_BIG_ENDIAN (__BYTE_ORDER == __BIG_ENDIAN)
-
-#elif defined(ARM) || defined(__SAM3X8E__)
-#define PLATFORM_IS_EMBEDDED 1
-#define PLATFORM_IS_ARM 1
+#if __BYTE_ORDER == __LITTLE_ENDIAN
 #define CPU_IS_LITTLE_ENDIAN 1
-#define CPU_IS_BIG_ENDIAN 0
-
-#elif defined(__AVR_ATmega1280__) || defined(__AVR_ATmega2560__) || defined(__AVR_ATmega168__) || defined(__AVR_ATmega168P__) || defined(__AVR_ATmega328P__)
-#define PLATFORM_IS_EMBEDDED 1
-#define PLATFORM_IS_ARM 0
-#define CPU_IS_LITTLE_ENDIAN 1
-#define CPU_IS_BIG_ENDIAN 0
-
-#elif defined(__MK20DX128__) || defined(__MK20DX256__) || defined(__MK64FX512__) || defined(__MK66FX1M0__)
-#define PLATFORM_IS_EMBEDDED 1
-#define PLATFORM_IS_ARM 1
-#define CPU_IS_LITTLE_ENDIAN 1
-#define CPU_IS_BIG_ENDIAN 0
+#elif __BYTE_ORDER == __BIG_ENDIAN
+#define CPU_IS_LITTLE_ENDIAN 0
+#else
+#error "Linux CPU endianness not defined"
+#endif
 
 #else
 
-#error Unknown platform not supported, be sure to set it up here, defining CPU_IS_LITTLE_ENDIAN and CPU_IS_BIG_ENDIAN
-#define PLATFORM_IS_EMBEDDED 0
-#define PLATFORM_IS_ARM 0
-#define CPU_IS_LITTLE_ENDIAN 1
-#define CPU_IS_BIG_ENDIAN 0
+#error "ISConstants: Undefined platform not supported"
 
-#endif // platform defines
+#endif  // WIN/LINUX/APPLE
 
-#if !defined(CPU_IS_LITTLE_ENDIAN) || !defined(CPU_IS_BIG_ENDIAN) || CPU_IS_LITTLE_ENDIAN == CPU_IS_BIG_ENDIAN
-
+#ifndef CPU_IS_LITTLE_ENDIAN
 #error Unsupported / unknown CPU architecture
-
-#endif // Invalid CPU endianess
-
+#endif // Invalid CPU endianness
 
 // "PLATFORM_IS_EMBEDDED" must be defined
-#if !defined(PLATFORM_IS_EMBEDDED) 
+#ifndef PLATFORM_IS_EMBEDDED
 #error "Missing PLATFORM_IS_EMBEDDED macro!!!"
 #endif
-
 
 #if PLATFORM_IS_EMBEDDED
 
