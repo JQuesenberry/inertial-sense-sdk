@@ -1,5 +1,5 @@
 #include "data_sets.h"
-// #include "IS_internal.h"
+// #include "imx_internal.h"
 
 // support types
 PYBIND11_NUMPY_DTYPE(gps_sat_sv_t, gnssId, svId, elev, azim, flags, cno, status); 

@@ -13,11 +13,13 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 #ifndef DATA_SETS_H
 #define DATA_SETS_H
 
+#include "ISConstants.h"
+#include "ISBoards.h"
+
 #include <stdint.h>
 #include <stdlib.h>
 #include <time.h>
 #include <string.h>
-#include "ISConstants.h"
 
 #ifdef __cplusplus
 extern "C" {
