@@ -11,6 +11,7 @@ SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=gnu++11 -Wall -Wextra -Wno-unused-f
 SET(BUILD_INERTIAL_SENSE_SDK 1)
 
 add_definitions(-DRTK_EMBEDDED)
+remove_definitions(-DUSE_IS_INTERNAL)
 find_package(Threads REQUIRED)
 
 add_library(InertialSense
