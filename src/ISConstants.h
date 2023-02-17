@@ -236,24 +236,6 @@ extern void vPortFree(void* pv);
 #define PACKED
 #endif
 
-// #define PACKED_STRUCT typedef struct PACKED
-// #define PACKED_UNION typedef union PACKED
-
-#ifndef RAMFUNC
-
-/* Define RAMFUNC attribute */
-#if defined   ( __CC_ARM   ) /* Keil uVision 4 */
-#   define RAMFUNC __attribute__ ((section(".RamFunc")))
-#elif defined ( __ICCARM__ ) /* IAR Ewarm 5.41+ */
-#   define RAMFUNC __ramfunc
-#elif defined (  __GNUC__  ) /* GCC CS3 2009q3-68 */
-#   define RAMFUNC __attribute__ ((section(".RamFunc")))
-#else
-#	define RAMFUNC
-#endif
-
-#endif
-
 #ifndef UNMASK
 #define UNMASK(_word, _prefix) (((_word) & (_prefix##_MASK)) >> (_prefix##_SHIFT))
 #endif
