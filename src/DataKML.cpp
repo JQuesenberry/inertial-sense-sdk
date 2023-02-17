@@ -31,11 +31,6 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLI
 #include "ISUtilities.h"
 #include "ISConstants.h"
 
-#ifdef USE_IS_INTERNAL
-#include "imx_internal.h"
-#endif
-
-
 cDataKML::cDataKML()
 {
 // 	def[0].init( "devInfo", "Device information" );
@@ -68,10 +63,6 @@ int cDataKML::WriteDataToFile(std::vector<sKmlLogData>& list, const p_data_hdr_t
 	ixEuler theta;
     sKmlLogData data;
 	bool deadreckoning = false;
-
-#ifdef USE_IS_INTERNAL
-// 	uInternalDatasets &i = (uInternalDatasets&)(*dataBuf);
-#endif
 
 	// Write date to file
 	switch (dataHdr->id)

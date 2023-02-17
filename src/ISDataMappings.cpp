@@ -2447,8 +2447,6 @@ cISDataMappings::cISDataMappings()
 	PopulateGpsPosMappings(m_lookupInfo, DID_GPS1_RTK_POS);
 	PopulateGpsVelMappings(m_lookupInfo, DID_GPS1_VEL);
 	PopulateGpsVelMappings(m_lookupInfo, DID_GPS2_VEL);
-	//PopulateGPSCNOMappings(m_lookupInfo, DID_GPS1_SAT); // too much data, we don't want to log this
-	//PopulateGPSCNOMappings(m_lookupInfo, DID_GPS2_SAT); // too much data, we don't want to log this
 	PopulateGpsRtkRelMappings(m_lookupInfo, DID_GPS1_RTK_POS_REL);
 	PopulateGpsRtkRelMappings(m_lookupInfo, DID_GPS2_RTK_CMP_REL);
 	PopulateGpsRtkMiscMappings(m_lookupInfo, DID_GPS1_RTK_POS_MISC);
@@ -2495,11 +2493,7 @@ cISDataMappings::cISDataMappings()
 	PopulateUserPage1Mappings(m_lookupInfo);
 	PopulateInl2MagObsInfo(m_lookupInfo);
 	PopulateInl2StatesMappings(m_lookupInfo);
-//     PopulateRtkStateMappings(m_lookupInfo);
-//     PopulateRtkResidualMappings(m_lookupInfo, DID_RTK_CODE_RESIDUAL);
-//     PopulateRtkResidualMappings(m_lookupInfo, DID_RTK_PHASE_RESIDUAL);
 	PopulateRtkDebugMappings(m_lookupInfo);
-	// PopulateRtkDebug2Mappings(m_lookupInfo);
 	PopulateIMUDeltaThetaVelocityMagMappings(m_lookupInfo);
 	PopulateIMUMagnetometerMappings(m_lookupInfo);
 
@@ -2532,8 +2526,6 @@ const char* cISDataMappings::GetDataSetName(uint32_t dataId)
 
 uint32_t cISDataMappings::GetDataSetId(string name)
 {
-// 	transform(name.begin(), name.end(), name.begin(), ::toupper);
-
 	for (eDataIDs id = 0; id < DID_COUNT; id++)
 	{
 		if (strcmp(name.c_str(), m_dataIdNames[id]) == 0)
