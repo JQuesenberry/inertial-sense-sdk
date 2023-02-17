@@ -790,12 +790,6 @@ protocol_type_t is_comm_parse(is_comm_instance_t* instance)
 			}
 			else 
 			{	// Searching for start byte
-				if (instance->parseState != -1)
-				{
-					instance->parseState = -1;
-					instance->rxErrorCount++;
-					return _PTYPE_PARSE_ERROR;	// Return to notify of error
-				}
 				continue;						// Continue to scan for data
 			}
 		}
@@ -839,11 +833,7 @@ protocol_type_t is_comm_parse(is_comm_instance_t* instance)
 			break;
 		case SPARTN_START_BYTE:
 			ptype = processSpartnByte(instance);
-			if(ptype == _PTYPE_PARSE_ERROR)
-			{
-				//time_delay_usec(500);	// Temporary test code
-			}
-			else if (ptype != _PTYPE_NONE)
+			if (ptype != _PTYPE_NONE)
 			{
 				return ptype;
 			}

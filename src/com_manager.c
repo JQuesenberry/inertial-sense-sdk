@@ -293,12 +293,6 @@ void comManagerStepInstance(CMHANDLE cmInstance_)
 	comManagerStepTxInstance(cmInstance);
 }
 
-// pfnISCommRead 
-// static int commRead(int pHandle, uint8_t *buffer, int numberOfBytes)
-// {
-// 	
-// } 
-
 void comManagerStepRxInstance(CMHANDLE cmInstance_)
 {
 	com_manager_t* cmInstance = (com_manager_t*)cmInstance_;
