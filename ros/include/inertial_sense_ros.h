@@ -382,22 +382,14 @@ public:
     // Flash parameters
     // navigation_dt_ms, EKF update period.  IMX-5:  16 default, 8 max.  Use `msg/ins.../period` to reduce INS output data rate.
     // navigation_dt_ms, EKF update period.  uINS-3: 4  default, 1 max.  Use `msg/ins.../period` to reduce INS output data rate.
-    int ins_nav_dt_ms_;
-    float insRotation_[3] = {0, 0, 0};
-    float insOffset_[3] = {0, 0, 0};
-    double refLla_[3] = {0, 0, 0};      // Upload disabled if all zero
-    float magDeclination_;
-    int insDynModel_;
+    nvm_flash_cfg_t flashConfiguration_ = {0};
     bool refLLA_known = false;
 
-    uint32_t ioConfigBits_ = 0;                 // this is read directly from the config,
-    uint32_t working_ioConfigBits_ = 0;         // this is the calculated/derived value from other parameters
+//  ioConfigBits is read directly from the config,
 
-    uint32_t rtkConfigBits_ = 0;                // this is read directly from the config
-    uint32_t working_rtkConfigBits_ = 0;        // this is the calculated/derived value from other parameters
+//    rtkConfigBits_ is read directly from the config
 
-    uint32_t wheelConfigBits_ = 0;              // this is read directly from the config
-    uint32_t working_wheelConfigBits_ = 0;      // this is the calculated/derived value from other parameters
+//    wheelConfigBits is read directly from the config
 
     float gpsTimeUserDelay_ = 0;
 

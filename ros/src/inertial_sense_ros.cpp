@@ -199,9 +199,9 @@ void InertialSenseROS::load_params(YAML::Node &node)
     ph.nodeParam("enable_log", log_enabled_, false);
 
     // advanced Parameters
-    ph.nodeParam("ioConfig", ioConfigBits_, 0x0244a060);     // EVB2: GPS1 Ser1 F9P, GPS2 disabled F9P, PPS G8
-    ph.nodeParam("RTKCfgBits", rtkConfigBits_, 0);            // rtk config bits
-    ph.nodeParam("wheelCfgBits", wheelConfigBits_, 0);        // wheel-encoder config bits
+    ph.nodeParam("ioConfig", flashConfiguration_.ioConfig, 0x0244a060);     // EVB2: GPS1 Ser1 F9P, GPS2 disabled F9P, PPS G8
+    ph.nodeParam("RTKCfgBits", flashConfiguration_.RTKCfgBits, 0);            // rtk config bits
+    ph.nodeParam("wheelCfgBits", flashConfiguration_.wheelConfig.bits, 0);        // wheel-encoder config bits
 
     ph.nodeParam("mag_declination", magDeclination_);
     ph.nodeParamVec("ref_lla", 3, refLla_);
@@ -537,7 +537,7 @@ bool InertialSenseROS::connect(float timeout)
     do {
         std::string cur_port = *ports_iterator;
         /// Connect to the uINS
-        ROS_INFO("Connecting to serial port \"%s\", at %d baud", cur_port.c_str(), baudrate_);
+        ROS_INFO("Connecting to serial port \"%s\", at %d baud", cur_port.c_str(), flashConfiguration_.;
         sdk_connected_ = IS_.Open(cur_port.c_str(), baudrate_);
         if (!sdk_connected_) {
             ROS_ERROR("inertialsense: Unable to open serial port \"%s\", at %d baud", cur_port.c_str(), baudrate_);
@@ -630,12 +630,12 @@ void InertialSenseROS::configure_flash_parameters()
     nvm_flash_cfg_t current_flash_cfg = IS_.GetFlashConfig();
     //ROS_INFO("Configuring flash: \nCurrent: %i, \nDesired: %i\n", current_flash_cfg.ioConfig, ioConfig_);
 
-    if (current_flash_cfg.startupNavDtMs != ins_nav_dt_ms_)
+    if (current_flash_cfg.startupNavDtMs != flashConfiguration_.startupNavDtMs)
     {
         ROS_INFO("navigation rate change from %dms to %dms, resetting uINS to make change", current_flash_cfg.startupNavDtMs, ins_nav_dt_ms_);
         reboot = true;
     }
-    if (current_flash_cfg.ioConfig != ioConfigBits_)
+    if (current_flash_cfg.ioConfig != flashConfiguration_.ioConfig)
     {
         ROS_INFO("ioConfig change from 0x%08X to 0x%08X, resetting uINS to make change", current_flash_cfg.ioConfig, ioConfigBits_);
         reboot = true;
@@ -649,8 +649,8 @@ void InertialSenseROS::configure_flash_parameters()
             setRefLla = true;
         }
     }
-    if (!vecF32Match(current_flash_cfg.insRotation, insRotation_) ||
-        !vecF32Match(current_flash_cfg.insOffset, insOffset_) ||
+    if (!vecF32Match(current_flash_cfg.insRotation, flashConfiguration_.insRotation) ||
+        !vecF32Match(current_flash_cfg.insOffset, flashConfiguration_.insOffset) ||
         !vecF32Match(current_flash_cfg.gps1AntOffset, rs_.gps1.antennaOffset) ||
         !vecF32Match(current_flash_cfg.gps2AntOffset, rs_.gps2.antennaOffset) ||
         (setRefLla && !vecF64Match(current_flash_cfg.refLla, refLla_)) ||
