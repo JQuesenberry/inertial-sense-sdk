@@ -23,7 +23,8 @@ extern "C" {
 #define DID_EVB_LUNA_VELOCITY_CONTROL   (eDataIDs)114 /** (evb_luna_velocity_control_t) EVB wheel control information */
 #define DID_EVB_LUNA_VELOCITY_COMMAND   (eDataIDs)115 /** (evb_luna_velocity_command_t) EVB velocity command */
 #define DID_EVB_LUNA_AUX_COMMAND        (eDataIDs)116 /** (evb_luna_aux_command_t) EVB auxillary commands */
-#define DID_LUNA_COUNT					117				/** Make larger than all Luna DIDs */
+#define DID_EVB_LUNA_MSG_POSE_1			(eDataIDs)117 /** (evb_luna_msg_pose_1_t) EVB LUNA pose data*/
+#define DID_LUNA_COUNT					118				/** Make larger than all Luna DIDs */
 
 
 PUSH_PACK_1
@@ -366,6 +367,22 @@ typedef struct evb_luna_aux_command_t
     uint32_t                    command;	// (see eLunaAuxCommands)
 
 }evb_luna_aux_command_t;
+
+typedef struct evb_luna_msg_pose_1_t
+{
+	//Header header
+	uint32_t week;                 // GPS number of weeks since January 6th, 1980
+	double timeOfWeek;             // GPS time of week (since Sunday morning) in seconds
+	uint32_t solStatusFlags;       // Solution status flags
+	uint32_t hdwStatusFlags;       // Hardware status flags
+	float theta[3];                // Euler attitude in radians
+	float omega[3];                // Angular rate in radians/s
+	double latitude;               // (deg) Lattitude of the Luna frame origin
+	double longitude;              // (deg) Longitude of the Luna frame origin
+	float hAccuracy;               // (m) Horizontal position accuracy
+	float velocity[3];             // (m/s) Velocity (forward, right, down) in Luna (EVK) vehicle frame at Luna origin
+	float cov_se2_diag[3];         // Covariance diagonal of position (x,y) and heading
+}evb_luna_msg_pose_1_t;
 
 typedef enum
 {
