@@ -133,7 +133,7 @@ typedef void* CMHANDLE;
 typedef int(*pfnComManagerRead)(CMHANDLE cmHandle, int pHandle, uint8_t *buffer, int numberOfBytes);
 
 // sendFnc send data to the serial port represented by pHandle - return number of bytes written
-typedef int(*pfnComManagerSend)(CMHANDLE cmHandle, int pHandle, unsigned char* buffer, int numberOfBytes);
+typedef int(*pfnComManagerSend)(CMHANDLE cmHandle, int pHandle, unsigned char* buffer, int numberOfBytes, uint8_t forceSend);
 
 // txFreeFnc optional, return the number of free bytes in the send buffer for the serial port represented by pHandle
 typedef int(*pfnComManagerSendBufferAvailableBytes)(CMHANDLE cmHandle, int pHandle);

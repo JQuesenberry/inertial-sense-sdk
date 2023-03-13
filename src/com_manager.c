@@ -1154,7 +1154,7 @@ int sendPacket(com_manager_t* cmInstance, int pHandle, packet_t *dPkt, uint8_t a
 	// Send Packet
 	else if (cmInstance->sendPacketCallback)
 	{
-		cmInstance->sendPacketCallback(cmInstance, pHandle, buffer.buf, buffer.size);
+		cmInstance->sendPacketCallback(cmInstance, pHandle, buffer.buf, buffer.size, 0);
 	}
 
 	return 0;
@@ -1236,7 +1236,7 @@ int sendDataPacket(com_manager_t* cmInstance, int pHandle, pkt_info_t* msg)
 				}
 
 				// Send the packet using the specified callback
-				sendCallback(cmInstance, pHandle, bufToSend.buf, bufToSend.size);
+				sendCallback(cmInstance, pHandle, bufToSend.buf, bufToSend.size, 0);
 				
 #if ENABLE_PACKET_CONTINUATION
 
@@ -1257,7 +1257,7 @@ int sendDataPacket(com_manager_t* cmInstance, int pHandle, pkt_info_t* msg)
 			}
 
 			// Send the packet using the specified callback
-			sendCallback(cmInstance, pHandle, bufToSend.buf, bufToSend.size);
+			sendCallback(cmInstance, pHandle, bufToSend.buf, bufToSend.size, 0);
 		} break;
 	}
 
