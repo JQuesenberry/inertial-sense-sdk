@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 cmake_minimum_required(VERSION 3.16.3) # Based on Ubuntu 20
+=======
+CMAKE_MINIMUM_REQUIRED(VERSION 2.8.12)
+>>>>>>> origin/release_2.0.0
 
 project(ExampleProjects)
 

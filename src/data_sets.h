@@ -80,7 +80,7 @@ typedef uint32_t eDataIDs;
 #define DID_UNUSED_45           		(eDataIDs)45 /** used to be internal DID_SYS_SENSORS_SIGMA */
 #define DID_SENSORS_ADC_SIGMA           (eDataIDs)46 /** INTERNAL USE ONLY (sys_sensors_adc_t) */
 #define DID_REFERENCE_MAGNETOMETER      (eDataIDs)47 /** (magnetometer_t) Reference or truth magnetometer used for manufacturing calibration and testing */
-#define DID_INL2_STATES                 (eDataIDs)48 /** (inl2_states_t) */
+#define DID_INL2_STATES                 (eDataIDs)48 /** (inl2_states_t) INS Extended Kalman Filter (EKF) states */
 #define DID_INL2_COVARIANCE_LD          (eDataIDs)49 /** (INL2_COVARIANCE_LD_ARRAY_SIZE) */
 #define DID_INL2_STATUS                 (eDataIDs)50 /** (inl2_status_t) */
 #define DID_INL2_MISC                   (eDataIDs)51 /** (inl2_misc_t) */
@@ -131,6 +131,14 @@ typedef uint32_t eDataIDs;
 #define DID_IMU3_RAW                    (eDataIDs)96 /** (imu3_t) Triple IMU data calibrated from DID_IMU3_UNCAL.  We recommend use of DID_IMU or DID_PIMU as they are oversampled and contain less noise. */
 #define DID_IMU_RAW                     (eDataIDs)97 /** (imu_t) IMU data averaged from DID_IMU3_RAW.  Use this IMU data for output data rates faster than DID_FLASH_CONFIG.startupNavDtMs.  Otherwise we recommend use of DID_IMU or DID_PIMU as they are oversampled and contain less noise. */
 
+#define DID_GPX_DEV_INFO                (eDataIDs)120 /** (dev_info_t) GPX device information */
+#define DID_GPX_FLASH_CFG               (eDataIDs)121 /** (gpx_flash_cfg_t) GPX flash configuration */
+#define DID_GPX_RTOS_INFO               (eDataIDs)122 /** (rtos_info_t) GPX RTOs info */
+#define DID_GPX_STATUS                  (eDataIDs)123 /** (gpx_status_t) GPX status */
+#define DID_GPX_DEBUG_ARRAY             (eDataIDs)124 /** (debug_array_t) GPX debug */
+#define DID_GPX_FIRST                             120 /** First of GPX DIDs */
+#define DID_GPX_LAST                              124 /** Last of GPX DIDs */
+
 // Adding a new data id?
 // 1] Add it above and increment the previous number, include the matching data structure type in the comments
 // 2] Add flip doubles and flip strings entries in data_sets.c
@@ -140,7 +148,7 @@ typedef uint32_t eDataIDs;
 // 6] Test!
 
 /** Count of data ids (including null data id 0) - MUST BE MULTPLE OF 4 and larger than last DID number! */
-#define DID_COUNT		(eDataIDs)120	// Used in SDK
+#define DID_COUNT		(eDataIDs)132	// Used in SDK
 #define DID_COUNT_UINS	(eDataIDs)100	// Used in uINS
 
 /** Maximum number of data ids */
@@ -952,7 +960,7 @@ typedef struct PACKED
     gps_sat_sv_t			sat[MAX_NUM_SAT_CHANNELS];	
 } gps_sat_t;
 
-
+#define GPS_VER_NUM_EXTENSIONS	6
 /** (DID_GPS1_VERSION) GPS version strings */
 typedef struct PACKED
 {
@@ -961,9 +969,7 @@ typedef struct PACKED
     /** Hardware version */
     uint8_t                 hwVersion[10];		
     /** Extension */
-    uint8_t                 extension[30];		
-    /** ensure 32 bit aligned in memory */
-    uint8_t					reserved[2];		
+	uint8_t                 extension[GPS_VER_NUM_EXTENSIONS][30];		
 } gps_version_t;
 
 // (DID_INL2_STATES) INL2 - INS Extended Kalman Filter (EKF) states
@@ -989,10 +995,10 @@ typedef struct PACKED
     
     /** (m)     Barometer bias */
     float					biasBaro;               
-    
+	
     /** (rad)   Magnetic declination */
     float					magDec;                 
-    
+	
     /** (rad)   Magnetic inclination */
     float					magInc;                 
 } inl2_states_t;
@@ -1234,33 +1240,35 @@ typedef struct PACKED
 
 enum eSystemCommand 
 {
-    SYS_CMD_SAVE_PERSISTENT_MESSAGES                = 1,
-    SYS_CMD_ENABLE_BOOTLOADER_AND_RESET             = 2,
-    SYS_CMD_ENABLE_SENSOR_STATS                     = 3,
-    SYS_CMD_ENABLE_RTOS_STATS                       = 4,
-    SYS_CMD_ZERO_MOTION                             = 5,
-    SYS_CMD_REF_POINT_STATIONARY                    = 6,
-    SYS_CMD_REF_POINT_MOVING                        = 7,
+    SYS_CMD_NONE                                    = 0,            // (uint32 inv: 4294967295)
+    SYS_CMD_SAVE_PERSISTENT_MESSAGES                = 1,            // (uint32 inv: 4294967294)
+    SYS_CMD_ENABLE_BOOTLOADER_AND_RESET             = 2,            // (uint32 inv: 4294967293)
+    SYS_CMD_ENABLE_SENSOR_STATS                     = 3,            // (uint32 inv: 4294967292)
+    SYS_CMD_ENABLE_RTOS_STATS                       = 4,            // (uint32 inv: 4294967291)
+    SYS_CMD_ZERO_MOTION                             = 5,            // (uint32 inv: 4294967290)
+    SYS_CMD_REF_POINT_STATIONARY                    = 6,            // (uint32 inv: 4294967289)
+    SYS_CMD_REF_POINT_MOVING                        = 7,            // (uint32 inv: 4294967288)
 
-    SYS_CMD_ENABLE_GPS_LOW_LEVEL_CONFIG             = 10,
-    SYS_CMD_ENABLE_SERIAL_PORT_BRIDGE_USB_TO_GPS1   = 11,
-    SYS_CMD_ENABLE_SERIAL_PORT_BRIDGE_USB_TO_GPS2   = 12,
-    SYS_CMD_ENABLE_SERIAL_PORT_BRIDGE_USB_TO_SER0   = 13,
-    SYS_CMD_ENABLE_SERIAL_PORT_BRIDGE_USB_TO_SER1   = 14,
-    SYS_CMD_ENABLE_SERIAL_PORT_BRIDGE_USB_TO_SER2   = 15,
+    SYS_CMD_ENABLE_GPS_LOW_LEVEL_CONFIG             = 10,           // (uint32 inv: 4294967285)
+    SYS_CMD_ENABLE_SERIAL_PORT_BRIDGE_USB_TO_GPS1   = 11,           // (uint32 inv: 4294967284)
+    SYS_CMD_ENABLE_SERIAL_PORT_BRIDGE_USB_TO_GPS2   = 12,           // (uint32 inv: 4294967283)
+    SYS_CMD_ENABLE_SERIAL_PORT_BRIDGE_USB_TO_SER0   = 13,           // (uint32 inv: 4294967282)
+    SYS_CMD_ENABLE_SERIAL_PORT_BRIDGE_USB_TO_SER1   = 14,           // (uint32 inv: 4294967281)
+    SYS_CMD_ENABLE_SERIAL_PORT_BRIDGE_USB_TO_SER2   = 15,           // (uint32 inv: 4294967280)
 
-    SYS_CMD_GPX_ENABLE_BOOTLOADER_MODE              = 30,
-    SYS_CMD_GPX_ENABLE_GNSS1_CHIPSET_BOOTLOADER     = 31,
-    SYS_CMD_GPX_ENABLE_GNSS2_CHIPSET_BOOTLOADER     = 32,
+    SYS_CMD_GPX_ENABLE_BOOTLOADER_MODE              = 30,           // (uint32 inv: 4294967265)
+    SYS_CMD_GPX_ENABLE_GNSS1_CHIPSET_BOOTLOADER     = 31,           // (uint32 inv: 4294967264)
+    SYS_CMD_GPX_ENABLE_GNSS2_CHIPSET_BOOTLOADER     = 32,           // (uint32 inv: 4294967263)
 
-    SYS_CMD_TEST_GPIO							   	= 64,
+    SYS_CMD_TEST_GPIO							   	= 64,           // (uint32 inv: 4294967231)
 
-    SYS_CMD_SAVE_FLASH                              = 97,
-    SYS_CMD_SAVE_GPS_ASSIST_TO_FLASH_RESET          = 98,
-    SYS_CMD_SOFTWARE_RESET                          = 99,
-    SYS_CMD_MANF_UNLOCK                             = 1122334455,
-    SYS_CMD_MANF_FACTORY_RESET                      = 1357924680,	// SYS_CMD_MANF_RESET_UNLOCK must be sent prior to this command.
-    SYS_CMD_MANF_CHIP_ERASE                         = 1357924681,	// SYS_CMD_MANF_RESET_UNLOCK must be sent prior to this command.
+    SYS_CMD_SAVE_FLASH                              = 97,           // (uint32 inv: 4294967198)
+    SYS_CMD_SAVE_GPS_ASSIST_TO_FLASH_RESET          = 98,           // (uint32 inv: 4294967197)
+    SYS_CMD_SOFTWARE_RESET                          = 99,           // (uint32 inv: 4294967196)
+    SYS_CMD_MANF_UNLOCK                             = 1122334455,   // (uint32 inv: 3172632840) 
+    SYS_CMD_MANF_FACTORY_RESET                      = 1357924680,   // (uint32 inv: 2937042615) SYS_CMD_MANF_RESET_UNLOCK must be sent prior to this command.
+    SYS_CMD_MANF_CHIP_ERASE                         = 1357924681,   // (uint32 inv: 2937042614) SYS_CMD_MANF_RESET_UNLOCK must be sent prior to this command.
+    SYS_CMD_MANF_DOWNGRADE_CALIBRATION              = 1357924682,   // (uint32 inv: 2937042613) SYS_CMD_MANF_RESET_UNLOCK must be sent prior to this command.
 };
 
 enum eSerialPortBridge
@@ -1616,8 +1624,8 @@ typedef struct PACKED
     /** Mag recalibration progress indicator: 0-100 % */
     float					progress;
 
-    /** Magnetic declination estimate */
-    float					declination;
+	/** Magnetic declination estimate */
+	float					declination;
 } mag_cal_t;
 
 // (DID_INL2_MAG_OBS_INFO)
@@ -1647,8 +1655,8 @@ typedef struct PACKED
     /** Heading from INS */			
     float					insHdg;
 
-    /** Difference between mag heading and (INS heading plus mag declination) */
-    float					magInsHdgDelta;
+	/** Difference between mag heading and (INS heading plus mag declination) */
+	float					magInsHdgDelta;
 
     /** Normalized innovation squared (likelihood metric) */
     float					nis;
@@ -1899,12 +1907,12 @@ typedef struct PACKED
 /** System Configuration (used with DID_FLASH_CONFIG.sysCfgBits) */
 enum eSysConfigBits
 {
-    UNUSED1                                             = (int)0x00000001,
-    UNUSED2                                             = (int)0x00000002,
-    /*! Enable automatic mag recalibration */
-    SYS_CFG_BITS_AUTO_MAG_RECAL                         = (int)0x00000004,
-    /*! Disable mag declination estimation */
-    SYS_CFG_BITS_DISABLE_MAG_DECL_ESTIMATION            = (int)0x00000008,
+	UNUSED1                                             = (int)0x00000001,
+	UNUSED2                                             = (int)0x00000002,
+	/*! Enable automatic mag recalibration */
+	SYS_CFG_BITS_AUTO_MAG_RECAL                         = (int)0x00000004,
+	/*! Disable mag declination estimation */
+	SYS_CFG_BITS_DISABLE_MAG_DECL_ESTIMATION            = (int)0x00000008,
 
     /*! Disable LEDs */
     SYS_CFG_BITS_DISABLE_LEDS                           = (int)0x00000010,
@@ -2336,29 +2344,30 @@ enum eIoConfig
 
 enum ePlatformConfig
 {
-    // IMX Carrier Board
-    PLATFORM_CFG_TYPE_MASK                      = (int)0x0000001F,
-    PLATFORM_CFG_TYPE_NONE                      = (int)0,		// IMX-5 default
-    PLATFORM_CFG_TYPE_NONE_ONBOARD_G2           = (int)1,		// uINS-3 default
-    PLATFORM_CFG_TYPE_RUG1                      = (int)2,
-    PLATFORM_CFG_TYPE_RUG2_0_G1                 = (int)3,
-    PLATFORM_CFG_TYPE_RUG2_0_G2                 = (int)4,
-    PLATFORM_CFG_TYPE_RUG2_1_G0                 = (int)5,	    // PCB RUG-2.1, Case RUG-3.  GPS1 timepulse on G9
-    PLATFORM_CFG_TYPE_RUG2_1_G1                 = (int)6,       // "
-    PLATFORM_CFG_TYPE_RUG2_1_G2                 = (int)7,       // "
-    PLATFORM_CFG_TYPE_RUG3_G0                   = (int)8,       // PCB RUG-3.x.  GPS1 timepulse on GPS1_PPS TIMESYNC (pin 20)
-    PLATFORM_CFG_TYPE_RUG3_G1                   = (int)9,       // "
-    PLATFORM_CFG_TYPE_RUG3_G2                   = (int)10,      // "
-    PLATFORM_CFG_TYPE_EVB2_G2                   = (int)11,
-    PLATFORM_CFG_TYPE_EVB3                      = (int)12,
-    PLATFORM_CFG_TYPE_IG1_0_G2                  = (int)13,      // PCB IG-1.0.  GPS1 timepulse on G8
-    PLATFORM_CFG_TYPE_IG1_G1                    = (int)14,      // PCB IG-1.1 and later.  GPS1 timepulse on GPS1_PPS TIMESYNC (pin 20)
-    PLATFORM_CFG_TYPE_IG1_G2                    = (int)15,
+	// IMX Carrier Board
+	PLATFORM_CFG_TYPE_MASK                      = (int)0x0000001F,
+	PLATFORM_CFG_TYPE_NONE                      = (int)0,		// IMX-5 default
+	PLATFORM_CFG_TYPE_NONE_ONBOARD_G2           = (int)1,		// uINS-3 default
+	PLATFORM_CFG_TYPE_RUG1                      = (int)2,
+	PLATFORM_CFG_TYPE_RUG2_0_G1                 = (int)3,
+	PLATFORM_CFG_TYPE_RUG2_0_G2                 = (int)4,
+	PLATFORM_CFG_TYPE_RUG2_1_G0                 = (int)5,	    // PCB RUG-2.1, Case RUG-3.  GPS1 timepulse on G9
+	PLATFORM_CFG_TYPE_RUG2_1_G1                 = (int)6,       // "
+	PLATFORM_CFG_TYPE_RUG2_1_G2                 = (int)7,       // "
+	PLATFORM_CFG_TYPE_RUG3_G0                   = (int)8,       // PCB RUG-3.x.  GPS1 timepulse on GPS1_PPS TIMESYNC (pin 20)
+	PLATFORM_CFG_TYPE_RUG3_G1                   = (int)9,       // "
+	PLATFORM_CFG_TYPE_RUG3_G2                   = (int)10,      // "
+	PLATFORM_CFG_TYPE_EVB2_G2                   = (int)11,
+	PLATFORM_CFG_TYPE_RESERVED1                 = (int)12,
+	PLATFORM_CFG_TYPE_IG1_0_G2                  = (int)13,      // PCB IG-1.0.  GPS1 timepulse on G8
+	PLATFORM_CFG_TYPE_IG1_G1                    = (int)14,      // PCB IG-1.1 and later.  GPS1 timepulse on GPS1_PPS TIMESYNC (pin 20)
+	PLATFORM_CFG_TYPE_IG1_G2                    = (int)15,
     PLATFORM_CFG_TYPE_IG2                       = (int)16,		// IG-2 w/ IMX-5 and GPX-1
-    PLATFORM_CFG_TYPE_LAMBDA_G1                 = (int)50,		// Enable UBX output on Lambda for testbed
-    PLATFORM_CFG_TYPE_LAMBDA_G2                 = (int)51,		// "
-    PLATFORM_CFG_TYPE_TBED_2_G1_W_LAMBDA       = (int)52,		// Enable UBX input from Lambda
-    PLATFORM_CFG_TYPE_TBED_2_G2_W_LAMBDA       = (int)53,		// "
+	PLATFORM_CFG_TYPE_LAMBDA_G1                 = (int)17,		// Enable UBX output on Lambda for testbed
+	PLATFORM_CFG_TYPE_LAMBDA_G2                 = (int)18,		// "
+	PLATFORM_CFG_TYPE_TBED2_G1_W_LAMBDA         = (int)19,		// Enable UBX input from Lambda
+	PLATFORM_CFG_TYPE_TBED2_G2_W_LAMBDA         = (int)20,		// "
+	PLATFORM_CFG_TYPE_COUNT                     = (int)21,
 
     // Presets
     PLATFORM_CFG_PRESET_MASK                    = (int)0x0000FF00,
@@ -2552,7 +2561,7 @@ typedef struct PACKED
     /** Serial port 1 baud rate in bits per second */
     uint32_t				ser1BaudRate;
 
-    /** Rotation in radians about the X, Y, Z axes from Sensor Frame to Intermediate Output Frame.  Order applied: Z, Y, X. */
+    /** Rotation in radians about the X,Y,Z axes from Sensor Frame to Intermediate Output Frame.  Order applied: Z,Y,X. */
     float					insRotation[3];
 
     /** X,Y,Z offset in meters from Intermediate Output Frame to INS Output Frame. */
@@ -2648,9 +2657,9 @@ typedef struct PACKED
     /** Angular rate bias error sigma */
     float					StdGyrBias[3];		
     /** Barometric altitude bias error sigma */
-    float					StdBarBias;		
+	float					StdBarBias;		
     /** Mag declination error sigma */
-    float					StdMagDeclination;	
+	float					StdMagDeclination;	
 } inl2_ned_sigma_t;
 
 /** (DID_STROBE_IN_TIME) Timestamp for input strobe. */
@@ -3052,8 +3061,8 @@ typedef struct
     /** Orbit eccentricity (non-dimensional)  */
     double e;
 
-    /** Orbit inclination angle at reference time (rad) */
-    double i0;
+	/** Orbit inclination angle at reference time (rad) */
+	double i0;
 
     /** Longitude of ascending node of orbit plane at weekly epoch (rad) */
     double OMG0;
@@ -3605,6 +3614,44 @@ typedef struct
 } survey_in_t;
 
 
+//////////////////////////////////////////////////////////////////////////
+//  GPX
+//////////////////////////////////////////////////////////////////////////
+
+/**
+* (DID_GPX_FLASH_CFG) GPX flash config.
+*/
+typedef struct
+{  
+    /** Size of this struct */
+    uint32_t				size;
+
+    /** Checksum, excluding size and checksum */
+    uint32_t                checksum;
+
+    /** Manufacturer method for restoring flash defaults */
+    uint32_t                key;
+
+} gpx_flash_cfg_t;
+
+/**
+* (DID_GPX_STATUS) GPX status.
+*/
+typedef struct
+{
+	/** GPS time of week (since Sunday morning) in milliseconds */
+	uint32_t               	timeOfWeekMs;
+	
+	/** Status (eGpxStatus) */
+	uint32_t                gpxStatus;
+
+} gpx_status_t;
+
+
+//////////////////////////////////////////////////////////////////////////
+//  EVB
+//////////////////////////////////////////////////////////////////////////
+
 typedef enum
 {
     /** SD card logger: card ready */
@@ -4013,8 +4060,8 @@ typedef enum
     /** Task 5: Timer */
     TASK_TIMER,
 
-    /** Number of RTOS tasks */
-    IMX_RTOS_NUM_TASKS,                 // Keep last
+	/** Number of RTOS tasks */
+	IMX_RTOS_NUM_TASKS                 // Keep last
 } eRtosTask;
 
 /** RTOS tasks */
@@ -4132,8 +4179,8 @@ typedef struct PACKED
     /** Total memory freed using RTOS vPortFree() */
     uint32_t				freeSize;
 
-    /** Tasks */
-    rtos_task_t             task[IMX_RTOS_NUM_TASKS];
+	/** Tasks */
+	rtos_task_t             task[IMX_RTOS_NUM_TASKS];
 
 } rtos_info_t;
 
