@@ -11,7 +11,7 @@ if(INCLUDE_LUNA_DATA_SETS)	# run "cmake -DINCLUDE_LUNA_DATA_SETS=1 .."
     add_definitions(-DINCLUDE_LUNA_DATA_SETS)
 endif()
 
-find_package(yaml-cpp REQUIRED)
+# find_package(yaml-cpp REQUIRED)
 
 if(BUILD_INERTIAL_SENSE_SDK)	# Build w/ SDK
 
@@ -89,7 +89,10 @@ target_include_directories(cltool PUBLIC
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
 
-target_link_libraries(cltool pthread ${LIBUSB_LIBRARY} ${YAML_CPP_LIBRARIES} m)
+target_link_libraries(cltool pthread ${LIBUSB_LIBRARY} ${YAML_CPP_LIBRARIES})
+if(NOT WIN32)
+target_link_libraries(cltool m)
+endif()
 
 endif()
 

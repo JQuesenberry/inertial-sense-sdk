@@ -20,6 +20,9 @@ add_executable(ISAsciiExample
     ../../src/serialPort.c
     ../../src/serialPortPlatform.c
 )
+
+if(NOT WIN32)
 target_link_libraries(ISAsciiExample m)
+endif()
 
 endif()

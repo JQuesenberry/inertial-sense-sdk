@@ -33,20 +33,22 @@ add_executable(ISBootloaderExample
 	../../src/ISStream.cpp
 	../../src/ISFileManager.cpp
 )
-target_link_libraries(ISBootloaderExample m)
 
+if(NOT WIN32)
+target_link_libraries(ISBootloaderExample m)
 find_library(LIBUSB_LIBRARY
 	NAMES usb-1.0
 	PATH_SUFFIXES "lib" "lib32" "lib64"
 )
+target_link_libraries(ISBootloaderExample ${LIBUSB_LIBRARY})
+target_link_libraries(ISBootloaderExample pthread)
+endif()
 
 target_include_directories(ISBootloaderExample PUBLIC
 	../../src
 	../../src/libusb/libusb
 	../../src/libusb/msvc
 )
-
-target_link_libraries(ISBootloaderExample pthread ${LIBUSB_LIBRARY})
 
 endif()
 
