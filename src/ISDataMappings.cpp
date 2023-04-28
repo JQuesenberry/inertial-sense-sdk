@@ -268,8 +268,8 @@ static void PopulateBitMappings(map_name_to_info_t mappings[DID_COUNT])
 	map_name_to_info_t& m = mappings[DID_BIT];
 	uint32_t totalSize = 0;
 	ADD_MAP(m, totalSize, "state", state, 0, DataTypeUInt32, uint32_t, 0);
-	ADD_MAP(m, totalSize, "hdwBitStatus", hdwBitStatus, 0, DataTypeUInt32, uint32_t, 0);
-	ADD_MAP(m, totalSize, "calBitStatus", calBitStatus, 0, DataTypeUInt32, uint32_t, 0);
+	ADD_MAP(m, totalSize, "hdwBitStatus", hdwBitStatus, 0, DataTypeUInt32, uint32_t, DataFlagsDisplayHex);
+	ADD_MAP(m, totalSize, "calBitStatus", calBitStatus, 0, DataTypeUInt32, uint32_t, DataFlagsDisplayHex);
 
     ADD_MAP(m, totalSize, "tcPqrBias", tcPqrBias, 0, DataTypeFloat, float, 0);
     ADD_MAP(m, totalSize, "tcAccBias", tcAccBias, 0, DataTypeFloat, float, 0);
