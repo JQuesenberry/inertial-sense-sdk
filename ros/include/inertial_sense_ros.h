@@ -70,7 +70,7 @@
 #define LEAP_SECONDS 18           // GPS time does not have leap seconds, UNIX does (as of 1/1/2017 - next one is probably in 2020 sometime unless there is some crazy earthquake or nuclear blast)
 #define UNIX_TO_GPS_OFFSET (GPS_UNIX_OFFSET - LEAP_SECONDS)
 #define FIRMWARE_VERSION_CHAR0 1
-#define FIRMWARE_VERSION_CHAR1 9
+#define FIRMWARE_VERSION_CHAR1 10
 #define FIRMWARE_VERSION_CHAR2 0
 
 #define SET_CALLBACK(DID, __type, __cb_fun, __periodmultiple)                               \
