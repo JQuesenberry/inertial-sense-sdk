@@ -36,6 +36,7 @@ add_message_files(
   DID_INS2.msg
   DID_INS1.msg
   DID_INS4.msg
+  DevInfo.msg
 )
 
 add_service_files(

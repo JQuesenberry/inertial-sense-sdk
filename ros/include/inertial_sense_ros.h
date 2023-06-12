@@ -55,6 +55,7 @@
 #include "inertial_sense_ros/DID_INS2.h"
 #include "inertial_sense_ros/DID_INS1.h"
 #include "inertial_sense_ros/DID_INS4.h"
+#include "inertial_sense_ros/DevInfo.h"
 #include "nav_msgs/Odometry.h"
 #include "std_srvs/Trigger.h"
 #include "std_msgs/Header.h"
@@ -242,6 +243,8 @@ public:
         TopicHelperGpsRtk rtk_cmp;
 
         TopicHelper diagnostics;
+
+        TopicHelper dev_info;
     } rs_;
 
     bool NavSatFixConfigured = false;
@@ -381,6 +384,7 @@ public:
     geometry_msgs::Vector3Stamped gps2_velEcef;
     inertial_sense_ros::GPSInfo msg_gps1_info;
     inertial_sense_ros::GPSInfo msg_gps2_info;
+    inertial_sense_ros::DevInfo msg_dev_info;
 
     float poseCov_[36], twistCov_[36];
 

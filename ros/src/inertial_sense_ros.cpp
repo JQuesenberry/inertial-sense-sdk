@@ -141,6 +141,11 @@ void InertialSenseROS::initializeROS() {
     if (rs_.gps2_navsatfix.enabled)         { rs_.gps2_navsatfix.pub = nh_.advertise<sensor_msgs::NavSatFix>(rs_.gps2_navsatfix.topic, 1); }
     if (rs_.gps2_info.enabled)              { rs_.gps2_info.pub = nh_.advertise<inertial_sense_ros::GPSInfo>(rs_.gps2_info.topic, 1); }
 
+    if (rs_.dev_info.enabled) {
+      rs_.dev_info.pub = nh_.advertise<inertial_sense_ros::DevInfo>(rs_.dev_info.topic, 1, true);
+      rs_.dev_info.pub.publish(msg_dev_info);
+    }
+
     if (RTK_rover_ && RTK_rover_->positioning_enable )
     {
         rs_.rtk_pos.pubInfo = nh_.advertise<inertial_sense_ros::RTKInfo>("RTK_pos/info", 10);
@@ -281,7 +286,7 @@ void InertialSenseROS::load_params(YAML::Node &node)
     ph.msgParams(rs_.gps1_raw, "raw", "gps1/raw");
     ph.msgParams(rs_.gps1_navsatfix, "navsatfix", "gps1/NavSatFix");
     ph.msgParams(rs_.gps1_navsatfix_fused, "navsatfix_fused", "gps1/NavSatFix_Fused");
-    ph.msgParams(rs_.gps1_gpsfix, "gpxfix", "gps1/GPSFix");
+    ph.msgParams(rs_.gps1_gpsfix, "gpsfix", "gps1/GPSFix");
     ph.msgParams(rs_.gps1_gpsfix_fused, "gpsfix_fused", "gps1/GPSFix_Fused");
     gps1Node["messages"] = gps1Msgs;
     node["gps1"] = gps1Node;
@@ -297,6 +302,12 @@ void InertialSenseROS::load_params(YAML::Node &node)
     ph.msgParams(rs_.gps2_navsatfix, "navsatfix", "gps2/NavSatFix");
     gps2Node["messages"] = gps2Msgs;
     node["gps2"] = gps2Node;
+
+    YAML::Node devInfoNode = ph.node(node, "dev_info");
+    YAML::Node devInfoMsgs = ph.node(devInfoNode, "messages", 2);
+    ph.msgParams(rs_.dev_info, "dev_info", "dev_info");
+    devInfoNode["messages"] = devInfoMsgs;
+    node["dev_info"] = devInfoNode;
 
     YAML::Node evbNode = ph.node(node, "evb");
     ph.nodeParam("cb_preset", evb_.cb_preset, 2);        // 2=RS232(default), 3=XBee Radio On, 4=WiFi On & RS422, 5=SPI, 6=USB hub, 7=USB hub w/ RS422, 8=all off but USB
@@ -517,7 +528,19 @@ bool InertialSenseROS::connect(float timeout)
             ROS_ERROR("InertialSenseROS: Unable to open serial port \"%s\", at %d baud", cur_port.c_str(), baudrate_);
             sleep(1); // is this a good idea?
         } else {
-            ROS_INFO("InertialSenseROS: Connected to uINS %d on \"%s\", at %d baud", IS_.GetDeviceInfo().serialNumber, cur_port.c_str(), baudrate_);
+            size_t i;
+            const dev_info_t& dev_info = IS_.GetDeviceInfo();
+            ROS_INFO("InertialSenseROS: Connected to uINS %d on \"%s\", at %d baud", dev_info.serialNumber, cur_port.c_str(), baudrate_);
+            msg_dev_info.serialNumber = std::to_string(dev_info.serialNumber);
+            for(i=0; i<sizeof(dev_info.hardwareVer); i++) msg_dev_info.hardwareVer += (i == 0 ? "" : ".") + std::to_string(dev_info.hardwareVer[i]);
+            for(i=0; i<sizeof(dev_info.firmwareVer); i++) msg_dev_info.firmwareVer += (i == 0 ? "" : ".") + std::to_string(dev_info.firmwareVer[i]);
+            msg_dev_info.buildNumber = std::to_string(dev_info.buildNumber);
+            for(i=0; i<sizeof(dev_info.protocolVer); i++) msg_dev_info.protocolVer += (i == 0 ? "" : ".") + std::to_string(dev_info.protocolVer[i]);
+            msg_dev_info.repoRevision = std::to_string(dev_info.repoRevision);
+            for(i=0; i<sizeof(dev_info.manufacturer); i++) msg_dev_info.manufacturer += dev_info.manufacturer[i];
+            for(i=0; i<sizeof(dev_info.buildDate); i++) msg_dev_info.buildDate += (i == 0 ? "" : ".") + std::to_string(dev_info.buildDate[i]);
+            for(i=0; i<sizeof(dev_info.buildTime); i++) msg_dev_info.buildTime += (i == 0 ? "" : ".") + std::to_string(dev_info.buildTime[i]);
+            for(i=0; i<sizeof(dev_info.addInfo); i++) msg_dev_info.addInfo += dev_info.addInfo[i];
             port_ = cur_port;
             break;
         }
