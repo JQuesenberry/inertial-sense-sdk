@@ -28,7 +28,7 @@ void RtkRoverProvider::configure(YAML::Node& node) {
             std::string correction_src = node["correction_input"]["select"].as<std::string>();
             YAML::Node inputNode = node["correction_input"][correction_src];
             if (inputNode.IsDefined() && !inputNode.IsNull()) {
-                correction_input = RtkRoverCorrectionProviderFactory::buildCorrectionProvider(inputNode);
+                correction_input = RtkRoverCorrectionProviderFactory::buildCorrectionProvider(inputNode, is_, nh_);
                 if (correction_input == nullptr) {
                     ROS_ERROR_STREAM("Unable to configure RosRoverCorrectionProviders. Please validate the configuration:\n\n" << node << "\n\n");
                 }
@@ -182,6 +182,57 @@ void RtkRoverCorrectionProvider_Serial::configure(YAML::Node& node) {
     }
 }
 
+std::string RtkRoverCorrectionProvider_Serial::get_connection_string() {
+    std::string RTK_connection = "SERIAL:" + protocol_ + ":" + port_ + ":" + std::to_string(baud_rate_);
+
+    return RTK_connection;
+}
+
+void RtkRoverCorrectionProvider_Serial::connect_rtk_client()
+{
+    if (is_ == nullptr) {
+        ROS_FATAL("RTK Client connection requested, but configureIS() hasn't been called in the provider.");
+        ros::shutdown();
+        connecting_ = false;
+        return;
+    }
+    connecting_ = true;
+
+    // [type]:[protocol]:[ip/url]:[port]:[mountpoint]:[username]:[password]
+    std::string RTK_connection = get_connection_string();
+
+    int RTK_connection_attempt_count = 0;
+    while (RTK_connection_attempt_count < connection_attempt_limit_)
+    {
+        ++RTK_connection_attempt_count;
+
+        bool connected = is_->OpenConnectionToServer(RTK_connection);
+
+        if (connected)
+        {
+            ROS_INFO_STREAM("Successfully connected to " << RTK_connection << " RTK server");
+            break;
+        }
+        else
+        {
+            ROS_ERROR_STREAM("Failed to connect to base server at " << RTK_connection);
+
+            if (RTK_connection_attempt_count >= connection_attempt_limit_)
+            {
+                ROS_ERROR_STREAM("Giving up after " << RTK_connection_attempt_count << " failed attempts");
+            }
+            else
+            {
+                int sleep_duration = RTK_connection_attempt_count * connection_attempt_backoff_;
+                ROS_WARN_STREAM("Retrying connection in " << sleep_duration << " seconds");
+                ros::Duration(sleep_duration).sleep();
+            }
+        }
+    }
+
+    connecting_ = false;
+}
+
 /*
  *==================  RtkRoverCorrectionProvider_ROS ==================*
  */
@@ -190,9 +241,37 @@ void RtkRoverCorrectionProvider_ROS::configure(YAML::Node& node) {
         ph_.setCurrentNode(node);
         ph_.nodeParam("format", protocol_, "RTCM3");
         ph_.nodeParam("topic", topic_);
+        ros::master::V_TopicInfo master_topics;
+        ros::master::getTopics(master_topics);
+        for (ros::master::V_TopicInfo::iterator it = master_topics.begin() ; it != master_topics.end(); it++) {
+            const ros::master::TopicInfo& info = *it;
+            if (topic_ == info.name) {
+                topic_datatype_ = info.datatype;
+                break;
+            }
+        }
+        if (topic_datatype_ == "std_msgs/String") {
+            sub_ = nh_->subscribe(topic_, 1, &RtkRoverCorrectionProvider_ROS::callback_std_msgs_String, this);
+            ROS_ERROR("RtkRoverCorrectionProvider_ROS - Subscribed to ROS Topic (%s) with DataType (%s).", topic_.c_str(), topic_datatype_.c_str());
+        } else if (topic_datatype_ == "mavros_msgs/RTCM") {
+            sub_ = nh_->subscribe(topic_, 1, &RtkRoverCorrectionProvider_ROS::callback_mavros_msgs_RTCM, this);
+            ROS_ERROR("RtkRoverCorrectionProvider_ROS - Subscribed to ROS Topic (%s) with DataType (%s).", topic_.c_str(), topic_datatype_.c_str());
+        } else if (topic_datatype_ == "") {
+            ROS_ERROR("RtkRoverCorrectionProvider_ROS - Specified ROS Topic (%s) with DataType (%s) Not Found.", topic_.c_str(), topic_datatype_.c_str());
+        } else {
+            ROS_ERROR("RtkRoverCorrectionProvider_ROS - Specified ROS Topic (%s) with DataType (%s) has No Callback Implemented.", topic_.c_str(), topic_datatype_.c_str());
+        }
     } else {
         ROS_ERROR("Unable to configure RtkRoverCorrectionProvider_ROS. The YAML node was null or undefined.");
     }
+}
+
+void RtkRoverCorrectionProvider_ROS::callback_std_msgs_String(const std_msgs::String::ConstPtr& msg) {
+    serialPortWrite(is_->GetSerialPort(), reinterpret_cast<const unsigned char*>(&msg->data[0]), msg->data.size());
+}
+
+void RtkRoverCorrectionProvider_ROS::callback_mavros_msgs_RTCM(const mavros_msgs::RTCM::ConstPtr& msg) {
+    serialPortWrite(is_->GetSerialPort(), &msg->data[0], msg->data.size());
 }
 
 /*

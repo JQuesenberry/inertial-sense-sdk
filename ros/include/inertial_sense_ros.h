@@ -38,6 +38,7 @@
 #include "sensor_msgs/FluidPressure.h"
 #include "sensor_msgs/JointState.h"
 #include "sensor_msgs/NavSatFix.h"
+#include "gps_common/GPSFix.h"
 #include "inertial_sense_ros/GPS.h"
 #include "data_sets.h"
 #include "inertial_sense_ros/GPSInfo.h"
@@ -131,6 +132,7 @@ public:
     bool sdk_connected_ = false;
     bool log_enabled_ = false;
     bool covariance_enabled_;
+    std::string log_directory_ = "";
     int platformConfig_ = 0;
 
     std::string frame_id_;
@@ -166,12 +168,12 @@ public:
     RtkRoverProvider* RTK_rover_;
     RtkBaseProvider* RTK_base_;
 
-    bool GNSS_Compass_ = false;
-
+#if 0
     ros::Timer rtk_connectivity_watchdog_timer_;
     void start_rtk_connectivity_watchdog_timer();
     void stop_rtk_connectivity_watchdog_timer();
     void rtk_connectivity_watchdog_timer_callback(const ros::TimerEvent &timer_event);
+#endif
 
     void INS1_callback(eDataIDs DID, const ins_1_t *const msg);
     void INS2_callback(eDataIDs DID, const ins_2_t *const msg);
@@ -227,6 +229,9 @@ public:
         TopicHelperGps gps1;
         TopicHelperGps gps2;
         TopicHelper gps1_navsatfix;
+        TopicHelper gps1_navsatfix_fused;
+        TopicHelper gps1_gpsfix;
+        TopicHelper gps1_gpsfix_fused;
         TopicHelper gps2_navsatfix;
         TopicHelper gps1_info;
         TopicHelper gps2_info;
@@ -365,6 +370,9 @@ public:
     inertial_sense_ros::GPS msg_gps1;
     inertial_sense_ros::GPS msg_gps2;
     sensor_msgs::NavSatFix msg_NavSatFix;
+    sensor_msgs::NavSatFix msg_NavSatFix_Fused;
+    gps_common::GPSFix msg_GpsFix;
+    gps_common::GPSFix msg_GpsFix_Fused;
     gps_pos_t gps1_pos;
     gps_pos_t gps2_pos;
     gps_vel_t gps1_vel;

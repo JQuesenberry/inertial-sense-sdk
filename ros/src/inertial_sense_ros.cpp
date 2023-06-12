@@ -132,6 +132,9 @@ void InertialSenseROS::initializeROS() {
 
     if (rs_.gps1.enabled)                   { rs_.gps1.pub = nh_.advertise<inertial_sense_ros::GPS>(rs_.gps1.topic, 1); }
     if (rs_.gps1_navsatfix.enabled)         { rs_.gps1_navsatfix.pub = nh_.advertise<sensor_msgs::NavSatFix>(rs_.gps1_navsatfix.topic, 1); }
+    if (rs_.gps1_navsatfix_fused.enabled)   { rs_.gps1_navsatfix_fused.pub = nh_.advertise<sensor_msgs::NavSatFix>(rs_.gps1_navsatfix_fused.topic, 1); }
+    if (rs_.gps1_gpsfix.enabled)            { rs_.gps1_gpsfix.pub = nh_.advertise<gps_common::GPSFix>(rs_.gps1_gpsfix.topic, 1); }
+    if (rs_.gps1_gpsfix_fused.enabled)      { rs_.gps1_gpsfix_fused.pub = nh_.advertise<gps_common::GPSFix>(rs_.gps1_gpsfix_fused.topic, 1); }
     if (rs_.gps1_info.enabled)              { rs_.gps1_info.pub = nh_.advertise<inertial_sense_ros::GPSInfo>(rs_.gps1_info.topic, 1); }
 
     if (rs_.gps2.enabled)                   { rs_.gps2.pub = nh_.advertise<inertial_sense_ros::GPS>(rs_.gps2.topic, 1); }
@@ -143,7 +146,7 @@ void InertialSenseROS::initializeROS() {
         rs_.rtk_pos.pubInfo = nh_.advertise<inertial_sense_ros::RTKInfo>("RTK_pos/info", 10);
         rs_.rtk_pos.pubRel = nh_.advertise<inertial_sense_ros::RTKRel>("RTK_pos/rel", 10);
     }
-    if (GNSS_Compass_)
+    if (RTK_rover_ && RTK_rover_->compassing_enable )
     {
         rs_.rtk_cmp.pubInfo = nh_.advertise<inertial_sense_ros::RTKInfo>("RTK_cmp/info", 10);
         rs_.rtk_cmp.pubRel = nh_.advertise<inertial_sense_ros::RTKRel>("RTK_cmp/rel", 10);
@@ -214,6 +217,7 @@ void InertialSenseROS::load_params(YAML::Node &node)
     ph.nodeParam("baudrate", baudrate_, 921600);
     ph.nodeParam("frame_id", frame_id_, "body");
     ph.nodeParam("enable_log", log_enabled_, false);
+    ph.nodeParam("log_directory", log_directory_, std::string(getenv("HOME")) + "/Documents/Inertial_Sense/Logs/");
 
     // advanced Parameters
     ph.nodeParam("ioConfig", ioConfigBits_, 0x0244a060);     // EVB2: GPS1 Ser1 F9P, GPS2 disabled F9P, PPS G8
@@ -276,6 +280,9 @@ void InertialSenseROS::load_params(YAML::Node &node)
     ph.msgParams(rs_.gps1_info, "info", "gps1/info");
     ph.msgParams(rs_.gps1_raw, "raw", "gps1/raw");
     ph.msgParams(rs_.gps1_navsatfix, "navsatfix", "gps1/NavSatFix");
+    ph.msgParams(rs_.gps1_navsatfix_fused, "navsatfix_fused", "gps1/NavSatFix_Fused");
+    ph.msgParams(rs_.gps1_gpsfix, "gpxfix", "gps1/GPSFix");
+    ph.msgParams(rs_.gps1_gpsfix_fused, "gpsfix_fused", "gps1/GPSFix_Fused");
     gps1Node["messages"] = gps1Msgs;
     node["gps1"] = gps1Node;
 
@@ -297,7 +304,7 @@ void InertialSenseROS::load_params(YAML::Node &node)
 
     YAML::Node rtkRoverNode = ph.node(node, "rtk_rover");
     if (rtkRoverNode.IsDefined() && !rtkRoverNode.IsNull())
-        RTK_rover_ = new RtkRoverProvider(rtkRoverNode);
+        RTK_rover_ = new RtkRoverProvider(rtkRoverNode, &IS_, &nh_);
 
     YAML::Node rtkBaseNode = ph.node(node, "rtk_base");
     if (rtkBaseNode.IsDefined() && !rtkBaseNode.IsNull())
@@ -473,8 +480,7 @@ void InertialSenseROS::configure_data_streams(bool firstrun) // if firstrun is t
 
 void InertialSenseROS::start_log()
 {
-    std::string filename = getenv("HOME");
-    filename += "/Documents/Inertial_Sense/Logs/" + cISLogger::CreateCurrentTimestamp();
+    std::string filename = log_directory_ + "/" + cISLogger::CreateCurrentTimestamp();
     ROS_INFO_STREAM("InertialSenseROS: Creating log in " << filename << " folder");
     IS_.SetLoggerEnabled(true, filename, cISLogger::LOGTYPE_DAT, RMC_PRESET_PPD_GROUND_VEHICLE);
 }
@@ -659,103 +665,6 @@ void InertialSenseROS::configure_flash_parameters()
     }
 }
 
-// FIXME:: THESE SHOULD BE IN RtkRoverCorrectionProvider_Ntrip
-void InertialSenseROS::connect_rtk_client(RtkRoverCorrectionProvider_Ntrip& config)
-{
-    config.connecting_ = true;
-
-    // [type]:[protocol]:[ip/url]:[port]:[mountpoint]:[username]:[password]
-    std::string RTK_connection = config.get_connection_string();
-
-    int RTK_connection_attempt_count = 0;
-    while (++RTK_connection_attempt_count < config.connection_attempt_limit_)
-    {
-        config.connected_ = IS_.OpenConnectionToServer(RTK_connection);
-
-        int sleep_duration = RTK_connection_attempt_count * config.connection_attempt_backoff_;
-        if (config.connected_) {
-            ROS_INFO_STREAM("InertialSenseROS: Successfully connected to RTK server [" << RTK_connection  << "]. [Attempt " << RTK_connection_attempt_count << "]");
-            break;
-        }
-        // fall-through
-
-        // ROS_ERROR_STREAM("Failed to connect to base server at " << RTK_connection);
-        if (RTK_connection_attempt_count < config.connection_attempt_limit_) {
-            ROS_WARN_STREAM("InertialSenseROS: Unable to establish connection with RTK server [" << RTK_connection << "] after attempt " << RTK_connection_attempt_count << ". Will try again in " << sleep_duration << " seconds.");
-        } else {
-            ROS_ERROR_STREAM("InertialSenseROS: Unable to establish connection with RTK server [" << RTK_connection << "] after attempt " << RTK_connection_attempt_count << ". Giving up.");
-        }
-        ros::Duration(sleep_duration).sleep(); // we will always sleep on a failure...
-    }
-
-    config.connecting_ = false;
-}
-
-void InertialSenseROS::rtk_connectivity_watchdog_timer_callback(const ros::TimerEvent &timer_event)
-{
-    if ((RTK_rover_ == nullptr) || (RTK_rover_->correction_input == nullptr) || (RTK_rover_->correction_input->type_ != "ntrip"))
-        return;
-
-    RtkRoverCorrectionProvider_Ntrip& config = *(RtkRoverCorrectionProvider_Ntrip*)(RTK_rover_->correction_input);
-    if (config.connecting_)
-    {
-        return;
-    }
-
-    int latest_byte_count = IS_.GetClientServerByteCount();
-    if (config.traffic_total_byte_count_ == latest_byte_count)
-    {
-        ++config.data_transmission_interruption_count_;
-
-        if (config.data_transmission_interruption_count_ >= config.data_transmission_interruption_limit_)
-        {
-            if (config.traffic_time > 0.0)
-                ROS_WARN_STREAM("Last received RTK correction data was " << (ros::Time::now().toSec() - config.traffic_time) << " seconds ago. Attempting to re-establish connection.");
-            connect_rtk_client(config);
-            if (config.connected_) {
-                config.traffic_total_byte_count_ = latest_byte_count;
-                config.data_transmission_interruption_count_ = 0;
-            }
-        } else {
-            if (config.traffic_time > 0.0)
-                ROS_WARN_STREAM("Last received RTK correction data was " << (ros::Time::now().toSec() - config.traffic_time) << " seconds ago.");
-        }
-    }
-    else
-    {
-        config.traffic_time = ros::Time::now().toSec();
-        config.traffic_total_byte_count_ = latest_byte_count;
-        config.data_transmission_interruption_count_ = 0;
-    }
-}
-
-void InertialSenseROS::start_rtk_connectivity_watchdog_timer()
-{
-    if ((RTK_rover_ == nullptr) || (RTK_rover_->correction_input == nullptr) || (RTK_rover_->correction_input->type_ != "ntrip"))
-        return;
-
-    RtkRoverCorrectionProvider_Ntrip& config = *(RtkRoverCorrectionProvider_Ntrip*)(RTK_rover_->correction_input);
-    if (!config.connectivity_watchdog_enabled_) {
-        return;
-    }
-
-    if (!rtk_connectivity_watchdog_timer_.isValid()) {
-        rtk_connectivity_watchdog_timer_ = nh_.createTimer(ros::Duration(config.connectivity_watchdog_timer_frequency_), InertialSenseROS::rtk_connectivity_watchdog_timer_callback, this);
-    }
-
-    rtk_connectivity_watchdog_timer_.start();
-}
-
-void InertialSenseROS::stop_rtk_connectivity_watchdog_timer()
-{
-    rtk_connectivity_watchdog_timer_.stop();
-    if ((RTK_rover_ != nullptr) && (RTK_rover_->correction_input != nullptr) && (RTK_rover_->correction_input->type_ != "ntrip")) {
-        RtkRoverCorrectionProvider_Ntrip& config = *(RtkRoverCorrectionProvider_Ntrip*)(RTK_rover_->correction_input);
-        config.traffic_total_byte_count_ = 0;
-        config.data_transmission_interruption_count_ = 0;
-    }
-}
-
 // FIXME:: THIS SHOULD BE IN RtkBaseCorrectionProvider_Ntrip
 void InertialSenseROS::start_rtk_server(RtkBaseCorrectionProvider_Ntrip& config)
 {
@@ -776,14 +685,23 @@ void InertialSenseROS::configure_rtk()
         if (RTK_rover_)
         {
             if (RTK_rover_->correction_input && (RTK_rover_->correction_input->type_ == "ntrip")) {
-                ROS_INFO("InertialSenseROS: Configuring RTK Rover");
+                RtkRoverCorrectionProvider_Ntrip* corr_prov = dynamic_cast<RtkRoverCorrectionProvider_Ntrip*>(RTK_rover_->correction_input);
+                ROS_INFO("InertialSenseROS: Configuring RTK Rover with NTRIP/TCP");
                 rs_.rtk_pos.enabled = true;
-                connect_rtk_client(*(RtkRoverCorrectionProvider_Ntrip *) RTK_rover_->correction_input);
+                corr_prov->connect_rtk_client();
                 rtkConfigBits_ |= RTK_CFG_BITS_ROVER_MODE_RTK_POSITIONING_EXTERNAL;
                 SET_CALLBACK(DID_GPS1_RTK_POS_MISC, gps_rtk_misc_t, RTK_Misc_callback, rs_.rtk_pos.period);
                 SET_CALLBACK(DID_GPS1_RTK_POS_REL, gps_rtk_rel_t, RTK_Rel_callback, rs_.rtk_pos.period);
-
-                start_rtk_connectivity_watchdog_timer();
+                corr_prov->start_connectivity_watchdog_timer();
+            }
+            if (RTK_rover_->correction_input && (RTK_rover_->correction_input->type_ == "serial")) {
+                RtkRoverCorrectionProvider_Serial* corr_prov = dynamic_cast<RtkRoverCorrectionProvider_Serial*>(RTK_rover_->correction_input);
+                ROS_INFO("InertialSenseROS: Configuring RTK Rover with Serial");
+                rs_.rtk_pos.enabled = true;
+                corr_prov->connect_rtk_client();
+                rtkConfigBits_ |= RTK_CFG_BITS_ROVER_MODE_RTK_POSITIONING_EXTERNAL;
+                SET_CALLBACK(DID_GPS1_RTK_POS_MISC, gps_rtk_misc_t, RTK_Misc_callback, rs_.rtk_pos.period);
+                SET_CALLBACK(DID_GPS1_RTK_POS_REL, gps_rtk_rel_t, RTK_Rel_callback, rs_.rtk_pos.period);
             }
             if (RTK_rover_->correction_input && (RTK_rover_->correction_input->type_ == "evb")) {
                 ROS_INFO("InertialSenseROS: Configuring RTK Rover with radio enabled");
@@ -794,7 +712,7 @@ void InertialSenseROS::configure_rtk()
                 SET_CALLBACK(DID_GPS1_RTK_POS_REL, gps_rtk_rel_t, RTK_Rel_callback, rs_.rtk_pos.period);
             }
         }
-        if (GNSS_Compass_)
+        if (RTK_rover_ && RTK_rover_->compassing_enable )
         {
             ROS_INFO("InertialSenseROS: Configuring Dual GNSS (compassing)");
             rs_.rtk_cmp.enabled = true;
@@ -823,9 +741,9 @@ void InertialSenseROS::configure_rtk()
     {
 
         ROS_ERROR_COND(RTK_rover_ && RTK_rover_->enable && RTK_base_ && RTK_base_->enable, "unable to configure onboard receiver to be both RTK rover and base - default to rover");
-        ROS_ERROR_COND(RTK_rover_  && RTK_rover_->enable && GNSS_Compass_, "unable to configure onboard receiver to be both RTK rover as dual GNSS - default to dual GNSS");
+        ROS_ERROR_COND(RTK_rover_  && RTK_rover_->enable && RTK_rover_->compassing_enable, "unable to configure onboard receiver to be both RTK rover as dual GNSS - default to dual GNSS");
 
-        if (GNSS_Compass_)
+        if (RTK_rover_ && RTK_rover_->compassing_enable )
         {
             ROS_INFO("InertialSenseROS: Configuring Dual GNSS (compassing)");
             RTK_rover_->enable = false; // FIXME:  Is this right?  Rover is disabled when in Compassing?
@@ -844,14 +762,24 @@ void InertialSenseROS::configure_rtk()
         }
         else if (RTK_rover_ && RTK_rover_->enable && RTK_rover_->correction_input && RTK_rover_->correction_input->type_ == "ntrip")
         {
-            ROS_INFO("InertialSenseROS: Configuring as RTK Rover");
+            RtkRoverCorrectionProvider_Ntrip* corr_prov = dynamic_cast<RtkRoverCorrectionProvider_Ntrip*>(RTK_rover_->correction_input);
+            ROS_INFO("InertialSenseROS: Configuring as RTK Rover with NTRIP/TCP");
             if (RTK_base_) RTK_base_->enable = false;
             rtkConfigBits_ |= (rs_.gps1.type == "F9P" ? RTK_CFG_BITS_ROVER_MODE_RTK_POSITIONING_EXTERNAL : RTK_CFG_BITS_ROVER_MODE_RTK_POSITIONING);
-            connect_rtk_client((RtkRoverCorrectionProvider_Ntrip&)*RTK_rover_->correction_input);
+            corr_prov->connect_rtk_client();
             SET_CALLBACK(DID_GPS1_RTK_POS_MISC, gps_rtk_misc_t, RTK_Misc_callback, rs_.rtk_pos.period);
             SET_CALLBACK(DID_GPS1_RTK_POS_REL, gps_rtk_rel_t, RTK_Rel_callback, rs_.rtk_pos.period);
-
-            start_rtk_connectivity_watchdog_timer();
+            corr_prov->start_connectivity_watchdog_timer();
+        }
+        else if (RTK_rover_ && RTK_rover_->enable && RTK_rover_->correction_input && RTK_rover_->correction_input->type_ == "serial")
+        {
+            RtkRoverCorrectionProvider_Serial* corr_prov = dynamic_cast<RtkRoverCorrectionProvider_Serial*>(RTK_rover_->correction_input);
+            ROS_INFO("InertialSenseROS: Configuring as RTK Rover with Serial");
+            if (RTK_base_) RTK_base_->enable = false;
+            rtkConfigBits_ |= (rs_.gps1.type == "F9P" ? RTK_CFG_BITS_ROVER_MODE_RTK_POSITIONING_EXTERNAL : RTK_CFG_BITS_ROVER_MODE_RTK_POSITIONING);
+            corr_prov->connect_rtk_client();
+            SET_CALLBACK(DID_GPS1_RTK_POS_MISC, gps_rtk_misc_t, RTK_Misc_callback, rs_.rtk_pos.period);
+            SET_CALLBACK(DID_GPS1_RTK_POS_REL, gps_rtk_rel_t, RTK_Rel_callback, rs_.rtk_pos.period);
         }
         else if (RTK_base_ && RTK_base_->enable)
         {
@@ -908,6 +836,42 @@ void InertialSenseROS::INS1_callback(eDataIDs DID, const ins_1_t *const msg)
         msg_did_ins1.ned[2] = msg->ned[2];
         if (rs_.did_ins1.pub.getNumSubscribers() > 0)
             rs_.did_ins1.pub.publish(msg_did_ins1);
+
+        float track_ground = msg->theta[2] * 180.0 / M_PI;
+        if(track_ground < 0.0)
+            track_ground = 360.0 + track_ground;
+
+        if (rs_.gps1_navsatfix_fused.enabled && NavSatFixConfigured) {
+            msg_NavSatFix_Fused = msg_NavSatFix;
+            msg_NavSatFix_Fused.header.stamp = ros_time_from_week_and_tow(msg->week, msg->timeOfWeek);
+            msg_NavSatFix_Fused.latitude = msg->lla[0];
+            msg_NavSatFix_Fused.longitude = msg->lla[1];
+            msg_NavSatFix_Fused.altitude = msg->lla[2];
+            rs_.gps1_navsatfix_fused.pub.publish(msg_NavSatFix_Fused);
+        }
+
+        if (rs_.gps1_gpsfix.enabled) {
+            msg_GpsFix.track = track_ground;
+        }
+
+        if (rs_.gps1_gpsfix_fused.enabled) {
+            msg_GpsFix_Fused = msg_GpsFix;
+            msg_GpsFix_Fused.header.stamp = ros_time_from_week_and_tow(msg->week, msg->timeOfWeek);
+            msg_GpsFix_Fused.status.position_source = gps_common::GPSStatus::SOURCE_GPS | gps_common::GPSStatus::SOURCE_ALTIMETER | gps_common::GPSStatus::SOURCE_ACCEL | gps_common::GPSStatus::SOURCE_GYRO;
+            msg_GpsFix_Fused.status.orientation_source = gps_common::GPSStatus::SOURCE_ACCEL | gps_common::GPSStatus::SOURCE_GYRO;
+            msg_GpsFix_Fused.status.motion_source = gps_common::GPSStatus::SOURCE_GPS | gps_common::GPSStatus::SOURCE_ALTIMETER | gps_common::GPSStatus::SOURCE_ACCEL;
+            msg_GpsFix_Fused.status.status = gps_common::GPSStatus::STATUS_FIX; // TODO
+            msg_GpsFix_Fused.latitude = msg->lla[0];
+            msg_GpsFix_Fused.longitude = msg->lla[1];
+            msg_GpsFix_Fused.altitude = rs_.gps1_gpsfix.enabled ? msg_GpsFix.altitude : msg->lla[2]; // need altitude in MSL, not above ellipsoid
+            msg_GpsFix_Fused.track = track_ground;
+            msg_GpsFix_Fused.speed = sqrt(pow(msg->uvw[0], 2.0) + pow(msg->uvw[1], 2.0) + pow(msg->uvw[2], 2.0));
+            msg_GpsFix_Fused.climb = msg->uvw[2];
+            msg_GpsFix_Fused.pitch = msg->theta[1] * 180.0 / M_PI;
+            msg_GpsFix_Fused.roll = msg->theta[0] * 180.0 / M_PI;
+            msg_GpsFix_Fused.time = msg->week * 604800.0 + msg->timeOfWeek;
+            rs_.gps1_gpsfix_fused.pub.publish(msg_GpsFix_Fused);
+        }
     }
 }
 
@@ -1407,6 +1371,44 @@ void InertialSenseROS::GPS_pos_callback(eDataIDs DID, const gps_pos_t *const msg
             msg_NavSatFix.position_covariance_type = COVARIANCE_TYPE_DIAGONAL_KNOWN;
             rs_.gps1_navsatfix.pub.publish(msg_NavSatFix);
         }
+
+        if (rs_.gps1_gpsfix.enabled)
+        {
+            msg_GpsFix.header.stamp = ros_time_from_week_and_tow(msg->week, msg->timeOfWeekMs / 1.0e3);
+            msg_GpsFix.status.position_source = gps_common::GPSStatus::SOURCE_GPS;
+            msg_GpsFix.status.orientation_source = gps_common::GPSStatus::SOURCE_NONE;
+            msg_GpsFix.status.motion_source = gps_common::GPSStatus::SOURCE_GPS;
+            msg_GpsFix.status.satellites_used = (uint8_t)(msg->status & GPS_STATUS_NUM_SATS_USED_MASK);
+            msg_GpsFix.status.status = gps_common::GPSStatus::STATUS_FIX; // TODO
+            msg_GpsFix.latitude = msg->lla[0];
+            msg_GpsFix.longitude = msg->lla[1];
+            msg_GpsFix.altitude = msg->hMSL; // need altitude in MSL, not above ellipsoid
+            //msg_GpsFix.track = 0; // See INS1_callback
+            //msg_GpsFix.speed = 0; // See GPS_vel_callback
+            //msg_GpsFix.climb = 0; // See GPS_vel_callback
+            msg_GpsFix.pitch;
+            msg_GpsFix.roll;
+            msg_GpsFix.dip = 0; // TODO
+            msg_GpsFix.time = msg->week * 604800.0 + msg->timeOfWeekMs / 1000.0;
+            msg_GpsFix.gdop = 0; // TODO
+            msg_GpsFix.pdop = msg->pDop;
+            msg_GpsFix.hdop = 0; // TODO
+            msg_GpsFix.vdop = 0; // TODO
+            msg_GpsFix.tdop = 0; // TODO
+            msg_GpsFix.err = 0; // TODO
+            msg_GpsFix.err_horz = 0; // TODO
+            msg_GpsFix.err_vert = 0; // TODO
+            msg_GpsFix.err_track = 0; // TODO
+            msg_GpsFix.err_speed = 0; // TODO
+            msg_GpsFix.err_climb = 0; // TODO
+            msg_GpsFix.err_time = 0; // TODO
+            msg_GpsFix.err_pitch = 0; // TODO
+            msg_GpsFix.err_roll = 0; // TODO
+            msg_GpsFix.err_dip = 0; // TODO
+            msg_GpsFix.position_covariance; // TODO
+            msg_GpsFix.position_covariance_type = gps_common::GPSFix::COVARIANCE_TYPE_UNKNOWN; // TODO
+            rs_.gps1_gpsfix.pub.publish(msg_GpsFix);
+        }
     }
 }
 
@@ -1424,6 +1426,11 @@ void InertialSenseROS::GPS_vel_callback(eDataIDs DID, const gps_vel_t *const msg
             gps1_velEcef.vector.y = msg->vel[1];
             gps1_velEcef.vector.z = msg->vel[2];
             publishGPS1();
+            if (rs_.gps1_gpsfix.enabled)
+            {
+                msg_GpsFix.speed = sqrt(pow(msg->vel[0], 2.0) + pow(msg->vel[1], 2.0) + pow(msg->vel[2], 2.0));
+                msg_GpsFix.climb = msg->vel[2];
+            }
         }
         break;
 

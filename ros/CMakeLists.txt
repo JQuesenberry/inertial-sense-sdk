@@ -6,6 +6,8 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
   std_msgs
+  mavros_msgs
+  gps_common
   sensor_msgs
   geometry_msgs
   diagnostic_msgs
@@ -45,13 +47,15 @@ add_service_files(
 generate_messages(
   DEPENDENCIES
   std_msgs
+  mavros_msgs
+  gps_common
   geometry_msgs
 )
 
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES inertial_sense_ros
-  CATKIN_DEPENDS roscpp sensor_msgs geometry_msgs
+  CATKIN_DEPENDS roscpp sensor_msgs geometry_msgs mavros_msgs gps_common
 )
 
 # We don't need the example projects
