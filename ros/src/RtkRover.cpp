@@ -253,6 +253,9 @@ void RtkRoverCorrectionProvider_ROS::configure(YAML::Node& node) {
         if (topic_datatype_ == "std_msgs/String") {
             sub_ = nh_->subscribe(topic_, 1, &RtkRoverCorrectionProvider_ROS::callback_std_msgs_String, this);
             ROS_ERROR("RtkRoverCorrectionProvider_ROS - Subscribed to ROS Topic (%s) with DataType (%s).", topic_.c_str(), topic_datatype_.c_str());
+        } else if (topic_datatype_ == "std_msgs/UInt8MultiArray") {
+            sub_ = nh_->subscribe(topic_, 1, &RtkRoverCorrectionProvider_ROS::callback_std_msgs_String, this);
+            ROS_ERROR("RtkRoverCorrectionProvider_ROS - Subscribed to ROS Topic (%s) with DataType (%s).", topic_.c_str(), topic_datatype_.c_str());
         } else if (topic_datatype_ == "mavros_msgs/RTCM") {
             sub_ = nh_->subscribe(topic_, 1, &RtkRoverCorrectionProvider_ROS::callback_mavros_msgs_RTCM, this);
             ROS_ERROR("RtkRoverCorrectionProvider_ROS - Subscribed to ROS Topic (%s) with DataType (%s).", topic_.c_str(), topic_datatype_.c_str());
@@ -268,6 +271,10 @@ void RtkRoverCorrectionProvider_ROS::configure(YAML::Node& node) {
 
 void RtkRoverCorrectionProvider_ROS::callback_std_msgs_String(const std_msgs::String::ConstPtr& msg) {
     serialPortWrite(is_->GetSerialPort(), reinterpret_cast<const unsigned char*>(&msg->data[0]), msg->data.size());
+}
+
+void RtkRoverCorrectionProvider_ROS::callback_std_msgs_UInt8MultiArray(const std_msgs::UInt8MultiArray::ConstPtr& msg) {
+    serialPortWrite(is_->GetSerialPort(), &msg->data[0], msg->data.size());
 }
 
 void RtkRoverCorrectionProvider_ROS::callback_mavros_msgs_RTCM(const mavros_msgs::RTCM::ConstPtr& msg) {

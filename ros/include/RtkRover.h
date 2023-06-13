@@ -21,6 +21,7 @@
 
 #include "ros/ros.h"
 #include "std_msgs/String.h"
+#include "std_msgs/UInt8MultiArray.h"
 #include "mavros_msgs/RTCM.h"
 
 #include "ParamHelper.h"
@@ -91,6 +92,7 @@ public:
     virtual void configure(YAML::Node& node);
     ros::Subscriber sub_;
     void callback_std_msgs_String(const std_msgs::String::ConstPtr& msg);
+    void callback_std_msgs_UInt8MultiArray(const std_msgs::UInt8MultiArray::ConstPtr& msg);
     void callback_mavros_msgs_RTCM(const mavros_msgs::RTCM::ConstPtr& msg);
 };
 
