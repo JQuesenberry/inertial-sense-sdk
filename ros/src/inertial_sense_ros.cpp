@@ -304,10 +304,7 @@ void InertialSenseROS::load_params(YAML::Node &node)
     node["gps2"] = gps2Node;
 
     YAML::Node devInfoNode = ph.node(node, "dev_info");
-    YAML::Node devInfoMsgs = ph.node(devInfoNode, "messages", 2);
-    ph.msgParams(rs_.dev_info, "dev_info", "dev_info");
-    devInfoNode["messages"] = devInfoMsgs;
-    node["dev_info"] = devInfoNode;
+    ph.msgParams(rs_.dev_info, "message", "dev_info", true);
 
     YAML::Node evbNode = ph.node(node, "evb");
     ph.nodeParam("cb_preset", evb_.cb_preset, 2);        // 2=RS232(default), 3=XBee Radio On, 4=WiFi On & RS422, 5=SPI, 6=USB hub, 7=USB hub w/ RS422, 8=all off but USB
