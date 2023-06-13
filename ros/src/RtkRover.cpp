@@ -265,7 +265,7 @@ void RtkRoverCorrectionProvider_ROS::configure(YAML::Node& node) {
             sub_ = nh_->subscribe(topic_, 1, &RtkRoverCorrectionProvider_ROS::callback_std_msgs_String, this);
             ROS_INFO("RtkRoverCorrectionProvider_ROS - Subscribed to ROS Topic (%s) with DataType (%s).", topic_.c_str(), topic_datatype_.c_str());
         } else if (topic_datatype_ == "std_msgs/UInt8MultiArray") {
-            sub_ = nh_->subscribe(topic_, 1, &RtkRoverCorrectionProvider_ROS::callback_std_msgs_String, this);
+            sub_ = nh_->subscribe(topic_, 1, &RtkRoverCorrectionProvider_ROS::callback_std_msgs_UInt8MultiArray, this);
             ROS_INFO("RtkRoverCorrectionProvider_ROS - Subscribed to ROS Topic (%s) with DataType (%s).", topic_.c_str(), topic_datatype_.c_str());
         } else if (topic_datatype_ == "mavros_msgs/RTCM") {
             sub_ = nh_->subscribe(topic_, 1, &RtkRoverCorrectionProvider_ROS::callback_mavros_msgs_RTCM, this);
