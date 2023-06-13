@@ -241,24 +241,35 @@ void RtkRoverCorrectionProvider_ROS::configure(YAML::Node& node) {
         ph_.setCurrentNode(node);
         ph_.nodeParam("format", protocol_, "RTCM3");
         ph_.nodeParam("topic", topic_);
-        ros::master::V_TopicInfo master_topics;
-        ros::master::getTopics(master_topics);
-        for (ros::master::V_TopicInfo::iterator it = master_topics.begin() ; it != master_topics.end(); it++) {
-            const ros::master::TopicInfo& info = *it;
-            if (topic_ == info.name) {
-                topic_datatype_ = info.datatype;
+        int64_t time_remaining_us = 5000000;
+        while(ros::ok()) {
+            ros::master::V_TopicInfo master_topics;
+            ros::master::getTopics(master_topics);
+            for (ros::master::V_TopicInfo::iterator it = master_topics.begin() ; it != master_topics.end(); it++) {
+                const ros::master::TopicInfo& info = *it;
+                if (topic_ == info.name) {
+                    topic_datatype_ = info.datatype;
+                    break;
+                }
+            }
+            if(topic_datatype_ != "") {
                 break;
+            } else {
+                usleep(100000);
+                time_remaining_us -= 100000;
+                if(time_remaining_us <= 0)
+                    break;
             }
         }
         if (topic_datatype_ == "std_msgs/String") {
             sub_ = nh_->subscribe(topic_, 1, &RtkRoverCorrectionProvider_ROS::callback_std_msgs_String, this);
-            ROS_ERROR("RtkRoverCorrectionProvider_ROS - Subscribed to ROS Topic (%s) with DataType (%s).", topic_.c_str(), topic_datatype_.c_str());
+            ROS_INFO("RtkRoverCorrectionProvider_ROS - Subscribed to ROS Topic (%s) with DataType (%s).", topic_.c_str(), topic_datatype_.c_str());
         } else if (topic_datatype_ == "std_msgs/UInt8MultiArray") {
             sub_ = nh_->subscribe(topic_, 1, &RtkRoverCorrectionProvider_ROS::callback_std_msgs_String, this);
-            ROS_ERROR("RtkRoverCorrectionProvider_ROS - Subscribed to ROS Topic (%s) with DataType (%s).", topic_.c_str(), topic_datatype_.c_str());
+            ROS_INFO("RtkRoverCorrectionProvider_ROS - Subscribed to ROS Topic (%s) with DataType (%s).", topic_.c_str(), topic_datatype_.c_str());
         } else if (topic_datatype_ == "mavros_msgs/RTCM") {
             sub_ = nh_->subscribe(topic_, 1, &RtkRoverCorrectionProvider_ROS::callback_mavros_msgs_RTCM, this);
-            ROS_ERROR("RtkRoverCorrectionProvider_ROS - Subscribed to ROS Topic (%s) with DataType (%s).", topic_.c_str(), topic_datatype_.c_str());
+            ROS_INFO("RtkRoverCorrectionProvider_ROS - Subscribed to ROS Topic (%s) with DataType (%s).", topic_.c_str(), topic_datatype_.c_str());
         } else if (topic_datatype_ == "") {
             ROS_ERROR("RtkRoverCorrectionProvider_ROS - Specified ROS Topic (%s) with DataType (%s) Not Found.", topic_.c_str(), topic_datatype_.c_str());
         } else {

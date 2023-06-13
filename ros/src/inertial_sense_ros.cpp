@@ -714,7 +714,8 @@ void InertialSenseROS::configure_rtk()
                 SET_CALLBACK(DID_GPS1_RTK_POS_REL, gps_rtk_rel_t, RTK_Rel_callback, rs_.rtk_pos.period);
                 corr_prov->start_connectivity_watchdog_timer();
             }
-            if (RTK_rover_->correction_input && (RTK_rover_->correction_input->type_ == "serial")) {
+            else if (RTK_rover_->correction_input && (RTK_rover_->correction_input->type_ == "serial"))
+            {
                 RtkRoverCorrectionProvider_Serial* corr_prov = dynamic_cast<RtkRoverCorrectionProvider_Serial*>(RTK_rover_->correction_input);
                 ROS_INFO("InertialSenseROS: Configuring RTK Rover with Serial");
                 rs_.rtk_pos.enabled = true;
@@ -723,7 +724,17 @@ void InertialSenseROS::configure_rtk()
                 SET_CALLBACK(DID_GPS1_RTK_POS_MISC, gps_rtk_misc_t, RTK_Misc_callback, rs_.rtk_pos.period);
                 SET_CALLBACK(DID_GPS1_RTK_POS_REL, gps_rtk_rel_t, RTK_Rel_callback, rs_.rtk_pos.period);
             }
-            if (RTK_rover_->correction_input && (RTK_rover_->correction_input->type_ == "evb")) {
+            else if (RTK_rover_->correction_input && (RTK_rover_->correction_input->type_ == "ros_topic"))
+            {
+                RtkRoverCorrectionProvider_ROS* corr_prov = dynamic_cast<RtkRoverCorrectionProvider_ROS*>(RTK_rover_->correction_input);
+                ROS_INFO("InertialSenseROS: Configuring RTK Rover with ROS Topic");
+                rs_.rtk_pos.enabled = true;
+                rtkConfigBits_ |= RTK_CFG_BITS_ROVER_MODE_RTK_POSITIONING_EXTERNAL;
+                SET_CALLBACK(DID_GPS1_RTK_POS_MISC, gps_rtk_misc_t, RTK_Misc_callback, rs_.rtk_pos.period);
+                SET_CALLBACK(DID_GPS1_RTK_POS_REL, gps_rtk_rel_t, RTK_Rel_callback, rs_.rtk_pos.period);
+            }
+            else if (RTK_rover_->correction_input && (RTK_rover_->correction_input->type_ == "evb"))
+            {
                 ROS_INFO("InertialSenseROS: Configuring RTK Rover with radio enabled");
                 rs_.rtk_pos.enabled = true;
                 if (RTK_base_) RTK_base_->enable = false;
@@ -772,15 +783,7 @@ void InertialSenseROS::configure_rtk()
             SET_CALLBACK(DID_GPS2_RTK_CMP_REL, gps_rtk_rel_t, RTK_Rel_callback, rs_.rtk_cmp.period);
         }
 
-        if (RTK_rover_ && RTK_rover_->enable && RTK_rover_->correction_input && RTK_rover_->correction_input->type_ == "evb")
-        {
-            ROS_INFO("InertialSenseROS: Configuring RTK Rover with radio enabled");
-            if (RTK_base_) RTK_base_->enable = false;
-            rtkConfigBits_ |= (rs_.gps1.type == "F9P" ? RTK_CFG_BITS_ROVER_MODE_RTK_POSITIONING_EXTERNAL : RTK_CFG_BITS_ROVER_MODE_RTK_POSITIONING);
-            SET_CALLBACK(DID_GPS1_RTK_POS_MISC, gps_rtk_misc_t, RTK_Misc_callback, rs_.rtk_pos.period);
-            SET_CALLBACK(DID_GPS1_RTK_POS_REL, gps_rtk_rel_t, RTK_Rel_callback, rs_.rtk_pos.period);
-        }
-        else if (RTK_rover_ && RTK_rover_->enable && RTK_rover_->correction_input && RTK_rover_->correction_input->type_ == "ntrip")
+        if (RTK_rover_ && RTK_rover_->enable && RTK_rover_->correction_input && RTK_rover_->correction_input->type_ == "ntrip")
         {
             RtkRoverCorrectionProvider_Ntrip* corr_prov = dynamic_cast<RtkRoverCorrectionProvider_Ntrip*>(RTK_rover_->correction_input);
             ROS_INFO("InertialSenseROS: Configuring as RTK Rover with NTRIP/TCP");
@@ -798,6 +801,23 @@ void InertialSenseROS::configure_rtk()
             if (RTK_base_) RTK_base_->enable = false;
             rtkConfigBits_ |= (rs_.gps1.type == "F9P" ? RTK_CFG_BITS_ROVER_MODE_RTK_POSITIONING_EXTERNAL : RTK_CFG_BITS_ROVER_MODE_RTK_POSITIONING);
             corr_prov->connect_rtk_client();
+            SET_CALLBACK(DID_GPS1_RTK_POS_MISC, gps_rtk_misc_t, RTK_Misc_callback, rs_.rtk_pos.period);
+            SET_CALLBACK(DID_GPS1_RTK_POS_REL, gps_rtk_rel_t, RTK_Rel_callback, rs_.rtk_pos.period);
+        }
+        else if (RTK_rover_ && RTK_rover_->enable && RTK_rover_->correction_input && RTK_rover_->correction_input->type_ == "ros_topic")
+        {
+            RtkRoverCorrectionProvider_ROS* corr_prov = dynamic_cast<RtkRoverCorrectionProvider_ROS*>(RTK_rover_->correction_input);
+            ROS_INFO("InertialSenseROS: Configuring as RTK Rover with ROS Topic");
+            if (RTK_base_) RTK_base_->enable = false;
+            rtkConfigBits_ |= (rs_.gps1.type == "F9P" ? RTK_CFG_BITS_ROVER_MODE_RTK_POSITIONING_EXTERNAL : RTK_CFG_BITS_ROVER_MODE_RTK_POSITIONING);
+            SET_CALLBACK(DID_GPS1_RTK_POS_MISC, gps_rtk_misc_t, RTK_Misc_callback, rs_.rtk_pos.period);
+            SET_CALLBACK(DID_GPS1_RTK_POS_REL, gps_rtk_rel_t, RTK_Rel_callback, rs_.rtk_pos.period);
+        }
+        else if (RTK_rover_ && RTK_rover_->enable && RTK_rover_->correction_input && RTK_rover_->correction_input->type_ == "evb")
+        {
+            ROS_INFO("InertialSenseROS: Configuring RTK Rover with radio enabled");
+            if (RTK_base_) RTK_base_->enable = false;
+            rtkConfigBits_ |= (rs_.gps1.type == "F9P" ? RTK_CFG_BITS_ROVER_MODE_RTK_POSITIONING_EXTERNAL : RTK_CFG_BITS_ROVER_MODE_RTK_POSITIONING);
             SET_CALLBACK(DID_GPS1_RTK_POS_MISC, gps_rtk_misc_t, RTK_Misc_callback, rs_.rtk_pos.period);
             SET_CALLBACK(DID_GPS1_RTK_POS_REL, gps_rtk_rel_t, RTK_Rel_callback, rs_.rtk_pos.period);
         }
