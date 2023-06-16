@@ -43,6 +43,7 @@ add_service_files(
   FILES
   FirmwareUpdate.srv
   refLLAUpdate.srv
+  SystemCommand.srv
 )
 
 generate_messages(

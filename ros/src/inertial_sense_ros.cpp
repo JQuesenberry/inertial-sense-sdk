@@ -110,6 +110,7 @@ void InertialSenseROS::initializeROS() {
     mag_cal_srv_                    = nh_.advertiseService("single_axis_mag_cal", &InertialSenseROS::perform_mag_cal_srv_callback, this);
     multi_mag_cal_srv_              = nh_.advertiseService("multi_axis_mag_cal", &InertialSenseROS::perform_multi_mag_cal_srv_callback, this);
     //firmware_update_srv_          = nh_.advertiseService("firmware_update", &InertialSenseROS::update_firmware_srv_callback, this);
+    sysCommand_srv_                 = nh_.advertiseService("system_command", &InertialSenseROS::sysCommand_srv_callback, this);
 
     SET_CALLBACK(DID_STROBE_IN_TIME, strobe_in_time_t, strobe_in_time_callback, 0); // we always want the strobe
 
@@ -2187,6 +2188,16 @@ bool InertialSenseROS::update_firmware_srv_callback(inertial_sense_ros::Firmware
     //   }
     //   IS_.Open(port_.c_str(), baudrate_);
 
+    return true;
+}
+
+bool InertialSenseROS::sysCommand_srv_callback(inertial_sense_ros::SystemCommand::Request &req, inertial_sense_ros::SystemCommand::Response &res)
+{
+    // send system command
+    system_command_t sysCommand;
+    sysCommand.command = req.sysCommand;
+    sysCommand.invCommand = ~req.sysCommand;
+    IS_.SendData(DID_SYS_CMD, reinterpret_cast<uint8_t *>(&sysCommand), sizeof(system_command_t), 0);
     return true;
 }
 

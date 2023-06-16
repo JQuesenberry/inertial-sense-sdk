@@ -45,6 +45,7 @@
 #include "inertial_sense_ros/PIMU.h"
 #include "inertial_sense_ros/FirmwareUpdate.h"
 #include "inertial_sense_ros/refLLAUpdate.h"
+#include "inertial_sense_ros/SystemCommand.h"
 #include "inertial_sense_ros/RTKRel.h"
 #include "inertial_sense_ros/RTKInfo.h"
 #include "inertial_sense_ros/GNSSEphemeris.h"
@@ -262,11 +263,13 @@ public:
     ros::ServiceServer firmware_update_srv_;
     ros::ServiceServer refLLA_set_current_srv_;
     ros::ServiceServer refLLA_set_value_srv_;
+    ros::ServiceServer sysCommand_srv_;
     bool set_current_position_as_refLLA(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
     bool set_refLLA_to_value(inertial_sense_ros::refLLAUpdate::Request &req, inertial_sense_ros::refLLAUpdate::Response &res);
     bool perform_mag_cal_srv_callback(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
     bool perform_multi_mag_cal_srv_callback(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
     bool update_firmware_srv_callback(inertial_sense_ros::FirmwareUpdate::Request &req, inertial_sense_ros::FirmwareUpdate::Response &res);
+    bool sysCommand_srv_callback(inertial_sense_ros::SystemCommand::Request &req, inertial_sense_ros::SystemCommand::Response &res);
 
     void publishGPS1();
     void publishGPS2();
