@@ -185,6 +185,11 @@ void InertialSenseROS::initializeROS() {
         diagnostics_timer_ = nh_.createTimer(ros::Duration(0.5), &InertialSenseROS::diagnostics_callback, this); // 2 Hz
     }
 
+    rs_.ins_status_flags.pub = nh_.advertise<inertial_sense_ros::INSStatusFlags>(rs_.ins_status_flags.topic, 1, true);
+    rs_.hdw_status_flags.pub = nh_.advertise<inertial_sense_ros::HdwStatusFlags>(rs_.hdw_status_flags.topic, 1, true);
+    rs_.gps1_status.pub = nh_.advertise<inertial_sense_ros::GPSStatus>(rs_.gps1_status.topic, 1, true);
+    rs_.gps2_status.pub = nh_.advertise<inertial_sense_ros::GPSStatus>(rs_.gps2_status.topic, 1, true);
+
     data_stream_timer_ = nh_.createTimer(ros::Duration(1), configure_data_streams, this);
 }
 
@@ -273,6 +278,8 @@ void InertialSenseROS::load_params(YAML::Node &node)
     ph.msgParams(rs_.did_ins2, "did_ins2", "ins_quat_uvw_lla");
     ph.msgParams(rs_.did_ins4, "did_ins4", "ins_quat_ve_ecef", true);
     ph.msgParams(rs_.inl2_states, "inl2_states");
+    ph.msgParams(rs_.ins_status_flags, "ins_status_flags", "ins_status_flags");
+    ph.msgParams(rs_.hdw_status_flags, "hdw_status_flags", "hdw_status_flags");
     insNode["messages"] = insMsgs;
     node["ins"] = insNode;
 
@@ -289,6 +296,7 @@ void InertialSenseROS::load_params(YAML::Node &node)
     ph.msgParams(rs_.gps1_navsatfix_fused, "navsatfix_fused", "gps1/NavSatFix_Fused");
     ph.msgParams(rs_.gps1_gpsfix, "gpsfix", "gps1/GPSFix");
     ph.msgParams(rs_.gps1_gpsfix_fused, "gpsfix_fused", "gps1/GPSFix_Fused");
+    ph.msgParams(rs_.gps1_status, "status", "gps1/status");
     gps1Node["messages"] = gps1Msgs;
     node["gps1"] = gps1Node;
 
@@ -301,6 +309,7 @@ void InertialSenseROS::load_params(YAML::Node &node)
     ph.msgParams(rs_.gps2_info, "info", "gps2/info");
     ph.msgParams(rs_.gps2_raw, "raw", "gps2/raw");
     ph.msgParams(rs_.gps2_navsatfix, "navsatfix", "gps2/NavSatFix");
+    ph.msgParams(rs_.gps2_status, "status", "gps2/status");
     gps2Node["messages"] = gps2Msgs;
     node["gps2"] = gps2Node;
 
@@ -326,6 +335,102 @@ void InertialSenseROS::load_params(YAML::Node &node)
     // exit(1);
 }
 
+inertial_sense_ros::INSStatusFlags InertialSenseROS::process_ins_status(const uint32_t& ins_status)
+{
+    inertial_sense_ros::INSStatusFlags status;
+    status.INS_STATUS_ATT_ALIGN_COARSE              = (bool)(ins_status & INS_STATUS_ATT_ALIGN_COARSE);
+    status.INS_STATUS_VEL_ALIGN_COARSE              = (bool)(ins_status & INS_STATUS_VEL_ALIGN_COARSE);
+    status.INS_STATUS_POS_ALIGN_COARSE              = (bool)(ins_status & INS_STATUS_POS_ALIGN_COARSE);
+    status.INS_STATUS_WHEEL_AIDING_VEL              = (bool)(ins_status & INS_STATUS_WHEEL_AIDING_VEL);
+    status.INS_STATUS_ATT_ALIGN_FINE                = (bool)(ins_status & INS_STATUS_ATT_ALIGN_FINE);
+    status.INS_STATUS_VEL_ALIGN_FINE                = (bool)(ins_status & INS_STATUS_VEL_ALIGN_FINE);
+    status.INS_STATUS_POS_ALIGN_FINE                = (bool)(ins_status & INS_STATUS_POS_ALIGN_FINE);
+    status.INS_STATUS_GPS_AIDING_HEADING            = (bool)(ins_status & INS_STATUS_GPS_AIDING_HEADING);
+    status.INS_STATUS_GPS_AIDING_POS                = (bool)(ins_status & INS_STATUS_GPS_AIDING_POS);
+    status.INS_STATUS_GPS_UPDATE_IN_SOLUTION        = (bool)(ins_status & INS_STATUS_GPS_UPDATE_IN_SOLUTION);
+    status.INS_STATUS_MAG_AIDING_HEADING            = (bool)(ins_status & INS_STATUS_MAG_AIDING_HEADING);
+    status.INS_STATUS_NAV_MODE                      = (bool)(ins_status & INS_STATUS_NAV_MODE);
+    status.INS_STATUS_STATIONARY_MODE               = (bool)(ins_status & INS_STATUS_STATIONARY_MODE);
+    status.INS_STATUS_GPS_AIDING_VEL                = (bool)(ins_status & INS_STATUS_GPS_AIDING_VEL);
+    status.INS_STATUS_KINEMATIC_CAL_GOOD            = (bool)(ins_status & INS_STATUS_KINEMATIC_CAL_GOOD);
+
+    status.INS_STATUS_SOLUTION_                     = (uint8_t)((ins_status & INS_STATUS_SOLUTION_MASK)>>INS_STATUS_SOLUTION_OFFSET);
+
+    status.INS_STATUS_RTK_COMPASSING_BASELINE_UNSET = (bool)(ins_status & INS_STATUS_RTK_COMPASSING_BASELINE_UNSET);
+    status.INS_STATUS_RTK_COMPASSING_BASELINE_BAD   = (bool)(ins_status & INS_STATUS_RTK_COMPASSING_BASELINE_BAD);
+
+    status.INS_STATUS_MAG_RECALIBRATING             = (bool)(ins_status & INS_STATUS_MAG_RECALIBRATING);
+    status.INS_STATUS_MAG_INTERFERENCE_OR_BAD_CAL   = (bool)(ins_status & INS_STATUS_MAG_INTERFERENCE_OR_BAD_CAL);
+
+    status.INS_STATUS_NAV_FIX                       = (uint8_t)((ins_status & INS_STATUS_GPS_NAV_FIX_MASK)>>INS_STATUS_GPS_NAV_FIX_OFFSET);
+
+    status.INS_STATUS_RTK_COMPASSING_VALID          = (bool)(ins_status & INS_STATUS_RTK_COMPASSING_VALID);
+    status.INS_STATUS_RTK_RAW_GPS_DATA_ERROR        = (bool)(ins_status & INS_STATUS_RTK_RAW_GPS_DATA_ERROR);
+
+    status.INS_STATUS_RTK_ERR_BASE_DATA_MISSING     = (bool)(ins_status & INS_STATUS_RTK_ERR_BASE_DATA_MISSING);
+    status.INS_STATUS_RTK_ERR_BASE_POSITION_MOVING  = (bool)(ins_status & INS_STATUS_RTK_ERR_BASE_POSITION_MOVING);
+    status.INS_STATUS_RTK_ERR_BASE_POSITION_INVALID = (bool)(ins_status & INS_STATUS_RTK_ERR_BASE_POSITION_INVALID);
+    status.INS_STATUS_RTOS_TASK_PERIOD_OVERRUN      = (bool)(ins_status & INS_STATUS_RTOS_TASK_PERIOD_OVERRUN);
+    status.INS_STATUS_GENERAL_FAULT                 = (bool)(ins_status & INS_STATUS_GENERAL_FAULT);
+
+    return status;
+}
+
+inertial_sense_ros::HdwStatusFlags InertialSenseROS::process_hdw_status(const uint32_t& hdw_status)
+{
+    inertial_sense_ros::HdwStatusFlags status;
+    status.HDW_STATUS_MOTION_GYR_SIG          = (bool)(hdw_status & HDW_STATUS_MOTION_GYR_SIG);
+    status.HDW_STATUS_MOTION_ACC_SIG          = (bool)(hdw_status & HDW_STATUS_MOTION_ACC_SIG);
+    status.HDW_STATUS_MOTION_GYR_DEV          = (bool)(hdw_status & HDW_STATUS_MOTION_GYR_DEV);
+    status.HDW_STATUS_MOTION_ACC_DEV          = (bool)(hdw_status & HDW_STATUS_MOTION_ACC_DEV);
+    status.HDW_STATUS_GPS_SATELLITE_RX        = (bool)(hdw_status & HDW_STATUS_GPS_SATELLITE_RX);
+    status.HDW_STATUS_STROBE_IN_EVENT         = (bool)(hdw_status & HDW_STATUS_STROBE_IN_EVENT);
+    status.HDW_STATUS_GPS_TIME_OF_WEEK_VALID  = (bool)(hdw_status & HDW_STATUS_GPS_TIME_OF_WEEK_VALID);
+    status.HDW_STATUS_REFERENCE_IMU_RX        = (bool)(hdw_status & HDW_STATUS_REFERENCE_IMU_RX);
+    status.HDW_STATUS_SATURATION_GYR          = (bool)(hdw_status & HDW_STATUS_SATURATION_GYR);
+    status.HDW_STATUS_SATURATION_ACC          = (bool)(hdw_status & HDW_STATUS_SATURATION_ACC);
+    status.HDW_STATUS_SATURATION_MAG          = (bool)(hdw_status & HDW_STATUS_SATURATION_MAG);
+    status.HDW_STATUS_SATURATION_BARO         = (bool)(hdw_status & HDW_STATUS_SATURATION_BARO);
+    status.HDW_STATUS_SYSTEM_RESET_REQUIRED   = (bool)(hdw_status & HDW_STATUS_SYSTEM_RESET_REQUIRED);
+    status.HDW_STATUS_EKF_USING_REFERENCE_IMU = (bool)(hdw_status & HDW_STATUS_EKF_USING_REFERENCE_IMU);
+    status.HDW_STATUS_MAG_RECAL_COMPLETE      = (bool)(hdw_status & HDW_STATUS_MAG_RECAL_COMPLETE);
+    status.HDW_STATUS_FLASH_WRITE_PENDING     = (bool)(hdw_status & HDW_STATUS_FLASH_WRITE_PENDING);
+    status.HDW_STATUS_COM_PARSE_ERROR_COUNT_  = (uint8_t)((hdw_status&HDW_STATUS_COM_PARSE_ERR_COUNT_MASK)>>HDW_STATUS_COM_PARSE_ERR_COUNT_OFFSET);
+    status.HDW_STATUS_ERR_COM_TX_LIMITED      = (bool)(hdw_status & HDW_STATUS_ERR_COM_TX_LIMITED);
+    status.HDW_STATUS_ERR_COM_RX_OVERRUN      = (bool)(hdw_status & HDW_STATUS_ERR_COM_RX_OVERRUN);
+    status.HDW_STATUS_ERR_NO_GPS_PPS          = (bool)(hdw_status & HDW_STATUS_ERR_NO_GPS_PPS);
+    status.HDW_STATUS_GPS_PPS_TIMESYNC        = (bool)(hdw_status & HDW_STATUS_GPS_PPS_TIMESYNC);
+    status.HDW_STATUS_BIT                     = (uint8_t)((hdw_status & HDW_STATUS_BIT_MASK) >> 24);
+    status.HDW_STATUS_ERR_TEMPERATURE         = (bool)(hdw_status & HDW_STATUS_ERR_TEMPERATURE);
+    status.HDW_STATUS_SPI_INTERFACE_ENABLED   = (bool)(hdw_status & HDW_STATUS_SPI_INTERFACE_ENABLED);
+    status.HDW_STATUS_FAULT_RESET             = (uint8_t)((hdw_status & HDW_STATUS_FAULT_RESET_MASK) >> 28);
+    status.HDW_STATUS_FAULT_SYS_CRITICAL      = (bool)(hdw_status & HDW_STATUS_FAULT_SYS_CRITICAL);
+    return status;
+}
+
+inertial_sense_ros::GPSStatus InertialSenseROS::process_gps_status(const uint32_t& gps_status)
+{
+    inertial_sense_ros::GPSStatus status;
+    status.GPS_STATUS_NUM_SATS_USED                         = (uint8_t)(gps_status & GPS_STATUS_NUM_SATS_USED_MASK);
+    status.GPS_STATUS_FIX                                   = (uint8_t)((gps_status & GPS_STATUS_FIX_MASK) >> GPS_STATUS_FIX_BIT_OFFSET);
+    status.GPS_STATUS_FLAGS_FIX_OK                          = (bool)(gps_status & GPS_STATUS_FLAGS_FIX_OK);
+    status.GPS_STATUS_FLAGS_DGPS_USED                       = (bool)(gps_status & GPS_STATUS_FLAGS_DGPS_USED);
+    status.GPS_STATUS_FLAGS_RTK_FIX_AND_HOLD                = (bool)(gps_status & GPS_STATUS_FLAGS_RTK_FIX_AND_HOLD);
+    status.GPS_STATUS_FLAGS_GPS1_RTK_POSITION_ENABLED       = (bool)(gps_status & GPS_STATUS_FLAGS_GPS1_RTK_POSITION_ENABLED);
+    status.GPS_STATUS_FLAGS_STATIC_MODE                     = (bool)(gps_status & GPS_STATUS_FLAGS_STATIC_MODE);
+    status.GPS_STATUS_FLAGS_GPS2_RTK_COMPASS_ENABLED        = (bool)(gps_status & GPS_STATUS_FLAGS_GPS2_RTK_COMPASS_ENABLED);
+    status.GPS_STATUS_FLAGS_GPS1_RTK_RAW_GPS_DATA_ERROR     = (bool)(gps_status & GPS_STATUS_FLAGS_GPS1_RTK_RAW_GPS_DATA_ERROR);
+    status.GPS_STATUS_FLAGS_GPS1_RTK_BASE_DATA_MISSING      = (bool)(gps_status & GPS_STATUS_FLAGS_GPS1_RTK_BASE_DATA_MISSING);
+    status.GPS_STATUS_FLAGS_GPS1_RTK_BASE_POSITION_MOVING   = (bool)(gps_status & GPS_STATUS_FLAGS_GPS1_RTK_BASE_POSITION_MOVING);
+    status.GPS_STATUS_FLAGS_GPS1_RTK_BASE_POSITION_INVALID  = (bool)(gps_status & GPS_STATUS_FLAGS_GPS1_RTK_BASE_POSITION_INVALID);
+    status.GPS_STATUS_FLAGS_GPS1_RTK_POSITION_VALID         = (bool)(gps_status & GPS_STATUS_FLAGS_GPS1_RTK_POSITION_VALID);
+    status.GPS_STATUS_FLAGS_GPS2_RTK_COMPASS_VALID          = (bool)(gps_status & GPS_STATUS_FLAGS_GPS2_RTK_COMPASS_VALID);
+    status.GPS_STATUS_FLAGS_GPS2_RTK_COMPASS_BASELINE_BAD   = (bool)(gps_status & GPS_STATUS_FLAGS_GPS2_RTK_COMPASS_BASELINE_BAD);
+    status.GPS_STATUS_FLAGS_GPS2_RTK_COMPASS_BASELINE_UNSET = (bool)(gps_status & GPS_STATUS_FLAGS_GPS2_RTK_COMPASS_BASELINE_UNSET);
+    status.GPS_STATUS_FLAGS_GPS_NMEA_DATA                   = (bool)(gps_status & GPS_STATUS_FLAGS_GPS_NMEA_DATA);
+    status.GPS_STATUS_FLAGS_GPS_PPS_TIMESYNC                = (bool)(gps_status & GPS_STATUS_FLAGS_GPS_PPS_TIMESYNC);
+    return status;
+}
 
 void InertialSenseROS::configure_data_streams(const ros::TimerEvent& event)
 {
@@ -913,6 +1018,20 @@ void InertialSenseROS::INS1_callback(eDataIDs DID, const ins_1_t *const msg)
             msg_GpsFix_Fused.time = msg->week * 604800.0 + msg->timeOfWeek;
             rs_.gps1_gpsfix_fused.pub.publish(msg_GpsFix_Fused);
         }
+
+        if (rs_.ins_status_flags.enabled) {
+            if (msg->insStatus != ins_status_prev) {
+                rs_.ins_status_flags.pub.publish(process_ins_status(msg->insStatus));
+                ins_status_prev = msg->insStatus;
+            }
+        }
+
+        if (rs_.hdw_status_flags.enabled) {
+            if (msg->hdwStatus != hdw_status_prev) {
+                rs_.hdw_status_flags.pub.publish(process_ins_status(msg->hdwStatus));
+                hdw_status_prev = msg->hdwStatus;
+            }
+        }
     }
 }
 
@@ -940,6 +1059,20 @@ void InertialSenseROS::INS2_callback(eDataIDs DID, const ins_2_t *const msg)
         msg_did_ins2.lla[2] = msg->lla[2];
         if (rs_.did_ins2.pub.getNumSubscribers() > 0)
             rs_.did_ins2.pub.publish(msg_did_ins2);
+
+        if (rs_.ins_status_flags.enabled) {
+            if (msg->insStatus != ins_status_prev) {
+                rs_.ins_status_flags.pub.publish(process_ins_status(msg->insStatus));
+                ins_status_prev = msg->insStatus;
+            }
+        }
+
+        if (rs_.hdw_status_flags.enabled) {
+            if (msg->hdwStatus != hdw_status_prev) {
+                rs_.hdw_status_flags.pub.publish(process_ins_status(msg->hdwStatus));
+                hdw_status_prev = msg->hdwStatus;
+            }
+        }
     }
 }
 
@@ -972,6 +1105,20 @@ void InertialSenseROS::INS4_callback(eDataIDs DID, const ins_4_t *const msg)
         msg_did_ins4.ecef[2] = msg->ecef[2];
         if (rs_.did_ins4.pub.getNumSubscribers() > 0)
             rs_.did_ins4.pub.publish(msg_did_ins4);
+
+        if (rs_.ins_status_flags.enabled) {
+            if (msg->insStatus != ins_status_prev) {
+                rs_.ins_status_flags.pub.publish(process_ins_status(msg->insStatus));
+                ins_status_prev = msg->insStatus;
+            }
+        }
+
+        if (rs_.hdw_status_flags.enabled) {
+            if (msg->hdwStatus != hdw_status_prev) {
+                rs_.hdw_status_flags.pub.publish(process_ins_status(msg->hdwStatus));
+                hdw_status_prev = msg->hdwStatus;
+            }
+        }
     }
 
 
@@ -1344,6 +1491,13 @@ void InertialSenseROS::GPS_pos_callback(eDataIDs DID, const gps_pos_t *const msg
             msg_gps1.vAcc = msg->vAcc;
             msg_gps1.pDop = msg->pDop;
             publishGPS1();
+
+            if (rs_.gps1_status.enabled) {
+                if (msg->status != gps1_status_prev) {
+                    rs_.gps1_status.pub.publish(process_gps_status(msg->status));
+                    gps1_status_prev = msg->status;
+                }
+            }
         }
         break;
 
@@ -1369,6 +1523,13 @@ void InertialSenseROS::GPS_pos_callback(eDataIDs DID, const gps_pos_t *const msg
             msg_gps2.vAcc = msg->vAcc;
             msg_gps2.pDop = msg->pDop;
             publishGPS2();
+
+            if (rs_.gps2_status.enabled) {
+                if (msg->status != gps2_status_prev) {
+                    rs_.gps2_status.pub.publish(process_gps_status(msg->status));
+                    gps2_status_prev = msg->status;
+                }
+            }
         }
         break;
     }

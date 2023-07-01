@@ -57,6 +57,9 @@
 #include "inertial_sense_ros/DID_INS1.h"
 #include "inertial_sense_ros/DID_INS4.h"
 #include "inertial_sense_ros/DevInfo.h"
+#include "inertial_sense_ros/INSStatusFlags.h"
+#include "inertial_sense_ros/HdwStatusFlags.h"
+#include "inertial_sense_ros/GPSStatus.h"
 #include "nav_msgs/Odometry.h"
 #include "std_srvs/Trigger.h"
 #include "std_msgs/Header.h"
@@ -221,6 +224,8 @@ public:
         TopicHelper odom_ins_ecef;
         TopicHelper odom_ins_enu;
         TopicHelper inl2_states;
+        TopicHelper ins_status_flags;
+        TopicHelper hdw_status_flags;
 
         TopicHelper imu;
         TopicHelper pimu;
@@ -235,6 +240,8 @@ public:
         TopicHelper gps1_gpsfix;
         TopicHelper gps1_gpsfix_fused;
         TopicHelper gps2_navsatfix;
+        TopicHelper gps1_status;
+        TopicHelper gps2_status;
         TopicHelper gps1_info;
         TopicHelper gps2_info;
         TopicHelperGpsRaw gps1_raw;
@@ -422,7 +429,14 @@ public:
         int cb_preset;
         int cb_options;
     } evb_ = {};
-    
+
+    uint32_t ins_status_prev = 0;
+    uint32_t hdw_status_prev = 0;
+    uint32_t gps1_status_prev = 0;
+    uint32_t gps2_status_prev = 0;
+    inertial_sense_ros::INSStatusFlags process_ins_status(const uint32_t& ins_status);
+    inertial_sense_ros::HdwStatusFlags process_hdw_status(const uint32_t& hdw_status);
+    inertial_sense_ros::GPSStatus process_gps_status(const uint32_t& gps_status);
 };
 
 
