@@ -228,7 +228,8 @@ void InertialSenseROS::load_params(YAML::Node &node)
     ph.nodeParam("baudrate", baudrate_, 921600);
     ph.nodeParam("frame_id", frame_id_, "body");
     ph.nodeParam("enable_log", log_enabled_, false);
-    ph.nodeParam("log_directory", log_directory_, std::string(getenv("HOME")) + "/Documents/Inertial_Sense/Logs/");
+    const char* home_p = getenv("HOME");
+    ph.nodeParam("log_directory", log_directory_, home_p != nullptr ? (std::string(home_p) + "/Documents/Inertial_Sense/Logs/") : std::string("/tmp/Inertial_Sense/Logs"));
 
     // advanced Parameters
     ph.nodeParam("ioConfig", ioConfigBits_, 0x0244a060);     // EVB2: GPS1 Ser1 F9P, GPS2 disabled F9P, PPS G8
