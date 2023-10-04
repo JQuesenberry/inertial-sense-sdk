@@ -23,6 +23,7 @@
 #include <algorithm>
 #include <string>
 #include <cstdlib>
+#include <limits>
 #include <yaml-cpp/yaml.h>
 
 #include "TopicHelper.h"

@@ -33,6 +33,12 @@
 
 #define STREAMING_CHECK(streaming, DID)      if(!streaming){ streaming = true; ROS_DEBUG("InertialSenseROS: %s response received", cISDataMappings::GetDataSetName(DID)); }
 
+float float_NaN = std::numeric_limits<float>::quiet_NaN();
+float float_NaN_array[3] = {float_NaN, float_NaN, float_NaN};
+
+double double_NaN = std::numeric_limits<double>::quiet_NaN();
+double double_NaN_array[3] = {double_NaN, double_NaN, double_NaN};
+
 /**
  * Assigns an identity to the passed ROS:nav_msgs::Odometry pose/twist covariance matrix
  * @param msg_odom - the nav_msgs::Odometry message to set the identity on.
@@ -272,7 +278,7 @@ void InertialSenseROS::load_params(YAML::Node &node)
 
     // INS
     YAML::Node insNode = ph.node(node, "ins");
-    ph.nodeParamVec("rotation", 3, insRotation_);
+    ph.nodeParamVec("rotation", 3, insRotation_, float_NaN_array); // default to NaNs so we know it wasn't set
     ph.nodeParamVec("offset", 3, insOffset_);
     ph.nodeParam("navigation_dt_ms", ins_nav_dt_ms_, 4);
 
@@ -800,7 +806,9 @@ void InertialSenseROS::configure_flash_parameters()
     {
         for (int i=0; i<3; i++)
         {
-            current_flash_cfg.insRotation[i] = insRotation_[i];
+            // we don't want to overwrite insRotation values in the Flash Config that came from the infield calibration process, use NaNs as a don't modify
+            if(!std::isnan(insRotation_[i]))
+                current_flash_cfg.insRotation[i] = insRotation_[i];
             current_flash_cfg.insOffset[i] = insOffset_[i];
             current_flash_cfg.gps1AntOffset[i] = rs_.gps1.antennaOffset[i];
             current_flash_cfg.gps2AntOffset[i] = rs_.gps2.antennaOffset[i];
