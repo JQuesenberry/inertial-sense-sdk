@@ -46,6 +46,8 @@
 #include "inertial_sense_ros/FirmwareUpdate.h"
 #include "inertial_sense_ros/refLLAUpdate.h"
 #include "inertial_sense_ros/SystemCommand.h"
+#include "inertial_sense_ros/GroundVehicleCommand.h"
+#include "inertial_sense_ros/InfieldCalCommand.h"
 #include "inertial_sense_ros/RTKRel.h"
 #include "inertial_sense_ros/RTKInfo.h"
 #include "inertial_sense_ros/GNSSEphemeris.h"
@@ -57,9 +59,12 @@
 #include "inertial_sense_ros/DID_INS1.h"
 #include "inertial_sense_ros/DID_INS4.h"
 #include "inertial_sense_ros/DevInfo.h"
+#include "inertial_sense_ros/FlashConfig.h"
 #include "inertial_sense_ros/INSStatusFlags.h"
 #include "inertial_sense_ros/HdwStatusFlags.h"
 #include "inertial_sense_ros/GPSStatus.h"
+#include "inertial_sense_ros/GroundVehicle.h"
+#include "inertial_sense_ros/InfieldCal.h"
 #include "nav_msgs/Odometry.h"
 #include "std_srvs/Trigger.h"
 #include "std_msgs/Header.h"
@@ -139,6 +144,8 @@ public:
     bool covariance_enabled_;
     std::string log_directory_ = "";
     int platformConfig_ = 0;
+    int sysCfgBits_ = 0;
+    int sensorConfig_ = 0;
 
     std::string frame_id_;
 
@@ -203,6 +210,8 @@ public:
     void GPS_geph_callback(eDataIDs DID, const geph_t *const msg);
     void RTK_Misc_callback(eDataIDs DID, const gps_rtk_misc_t *const msg);
     void RTK_Rel_callback(eDataIDs DID, const gps_rtk_rel_t *const msg);
+    void Ground_Vehicle_callback(eDataIDs DID, const ground_vehicle_t *const msg);
+    void Infield_Cal_callback(eDataIDs DID, const infield_cal_t *const msg);
 
     float diagnostic_ar_ratio_, diagnostic_differential_age_, diagnostic_heading_base_to_rover_;
     uint diagnostic_fix_type_;
@@ -253,6 +262,12 @@ public:
         TopicHelper diagnostics;
 
         TopicHelper dev_info;
+
+        TopicHelper ground_vehicle;
+
+        TopicHelper infield_cal;
+
+        TopicHelper flash_config;
     } rs_;
 
     bool NavSatFixConfigured = false;
@@ -271,12 +286,16 @@ public:
     ros::ServiceServer refLLA_set_current_srv_;
     ros::ServiceServer refLLA_set_value_srv_;
     ros::ServiceServer sysCommand_srv_;
+    ros::ServiceServer groundVehicleCommand_srv_;
+    ros::ServiceServer infieldCalCommand_srv_;
     bool set_current_position_as_refLLA(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
     bool set_refLLA_to_value(inertial_sense_ros::refLLAUpdate::Request &req, inertial_sense_ros::refLLAUpdate::Response &res);
     bool perform_mag_cal_srv_callback(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
     bool perform_multi_mag_cal_srv_callback(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
     bool update_firmware_srv_callback(inertial_sense_ros::FirmwareUpdate::Request &req, inertial_sense_ros::FirmwareUpdate::Response &res);
     bool sysCommand_srv_callback(inertial_sense_ros::SystemCommand::Request &req, inertial_sense_ros::SystemCommand::Response &res);
+    bool groundVehicleCommand_srv_callback(inertial_sense_ros::GroundVehicleCommand::Request &req, inertial_sense_ros::GroundVehicleCommand::Response &res);
+    bool infieldCalCommand_srv_callback(inertial_sense_ros::InfieldCalCommand::Request &req, inertial_sense_ros::InfieldCalCommand::Response &res);
 
     void publishGPS1();
     void publishGPS2();
@@ -395,6 +414,9 @@ public:
     inertial_sense_ros::GPSInfo msg_gps1_info;
     inertial_sense_ros::GPSInfo msg_gps2_info;
     inertial_sense_ros::DevInfo msg_dev_info;
+    inertial_sense_ros::GroundVehicle msg_ground_vehicle;
+    inertial_sense_ros::InfieldCal msg_infield_cal;
+    inertial_sense_ros::FlashConfig msg_flash_config;
 
     float poseCov_[36], twistCov_[36];
 

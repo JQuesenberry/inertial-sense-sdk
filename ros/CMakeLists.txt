@@ -41,6 +41,15 @@ add_message_files(
   GPSStatus.msg
   HdwStatusFlags.msg
   INSStatusFlags.msg
+  GroundVehicle.msg
+  WheelConfig.msg
+  WheelTransform.msg
+  InfieldCal.msg
+  IMUs.msg
+  InfieldCalVAxis.msg
+  InfieldCalDirection.msg
+  IMUsAcc.msg
+  FlashConfig.msg
 )
 
 add_service_files(
@@ -48,6 +57,8 @@ add_service_files(
   FirmwareUpdate.srv
   refLLAUpdate.srv
   SystemCommand.srv
+  GroundVehicleCommand.srv
+  InfieldCalCommand.srv
 )
 
 generate_messages(
@@ -121,4 +132,8 @@ install(
   DIRECTORY
     launch
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+)
+
+catkin_install_python(PROGRAMS scripts/inertial_sense_calibration_tool
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )

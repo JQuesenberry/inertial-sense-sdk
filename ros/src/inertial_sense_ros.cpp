@@ -111,6 +111,8 @@ void InertialSenseROS::initializeROS() {
     multi_mag_cal_srv_              = nh_.advertiseService("multi_axis_mag_cal", &InertialSenseROS::perform_multi_mag_cal_srv_callback, this);
     //firmware_update_srv_          = nh_.advertiseService("firmware_update", &InertialSenseROS::update_firmware_srv_callback, this);
     sysCommand_srv_                 = nh_.advertiseService("system_command", &InertialSenseROS::sysCommand_srv_callback, this);
+    groundVehicleCommand_srv_       = nh_.advertiseService("ground_vehicle_command", &InertialSenseROS::groundVehicleCommand_srv_callback, this);
+    infieldCalCommand_srv_          = nh_.advertiseService("infield_cal_command", &InertialSenseROS::infieldCalCommand_srv_callback, this);
 
     SET_CALLBACK(DID_STROBE_IN_TIME, strobe_in_time_t, strobe_in_time_callback, 0); // we always want the strobe
 
@@ -145,6 +147,21 @@ void InertialSenseROS::initializeROS() {
     if (rs_.dev_info.enabled) {
       rs_.dev_info.pub = nh_.advertise<inertial_sense_ros::DevInfo>(rs_.dev_info.topic, 1, true);
       rs_.dev_info.pub.publish(msg_dev_info);
+    }
+
+    if (rs_.ground_vehicle.enabled) {
+      rs_.ground_vehicle.pub = nh_.advertise<inertial_sense_ros::GroundVehicle>(rs_.ground_vehicle.topic, 1, true);
+      rs_.ground_vehicle.pub.publish(msg_ground_vehicle);
+    }
+
+    if (rs_.infield_cal.enabled) {
+      rs_.infield_cal.pub = nh_.advertise<inertial_sense_ros::InfieldCal>(rs_.infield_cal.topic, 1, true);
+      rs_.infield_cal.pub.publish(msg_infield_cal);
+    }
+
+    if (rs_.flash_config.enabled) {
+      rs_.flash_config.pub = nh_.advertise<inertial_sense_ros::FlashConfig>(rs_.flash_config.topic, 1, true);
+      rs_.flash_config.pub.publish(msg_flash_config);
     }
 
     if (RTK_rover_ && RTK_rover_->positioning_enable )
@@ -240,6 +257,8 @@ void InertialSenseROS::load_params(YAML::Node &node)
     ph.nodeParamVec("ref_lla", 3, refLla_);
     ph.nodeParam("publishTf", publishTf_);
     ph.nodeParam("platformConfig", platformConfig_);
+    ph.nodeParam("sysCfgBits", sysCfgBits_, 0x00000004);
+    ph.nodeParam("sensorConfig", sensorConfig_, 0x0000000F);
 
     // Sensors
     YAML::Node sensorsNode = ph.node(node, "sensors");
@@ -316,6 +335,15 @@ void InertialSenseROS::load_params(YAML::Node &node)
 
     YAML::Node devInfoNode = ph.node(node, "dev_info");
     ph.msgParams(rs_.dev_info, "message", "dev_info", true);
+
+    YAML::Node groundVehicleNode = ph.node(node, "ground_vehicle");
+    ph.msgParams(rs_.ground_vehicle, "message", "ground_vehicle", true);
+
+    YAML::Node infieldCalNode = ph.node(node, "infield_cal");
+    ph.msgParams(rs_.infield_cal, "message", "infield_cal", true);
+
+    YAML::Node flashConfigNode = ph.node(node, "flash_config");
+    ph.msgParams(rs_.flash_config, "message", "flash_config", true);
 
     YAML::Node evbNode = ph.node(node, "evb");
     ph.nodeParam("cb_preset", evb_.cb_preset, 2);        // 2=RS232(default), 3=XBee Radio On, 4=WiFi On & RS422, 5=SPI, 6=USB hub, 7=USB hub w/ RS422, 8=all off but USB
@@ -584,6 +612,10 @@ void InertialSenseROS::configure_data_streams(bool firstrun) // if firstrun is t
     CONFIG_STREAM(rs_.barometer, DID_BAROMETER, barometer_t, baro_callback);
     CONFIG_STREAM(rs_.pimu, DID_PIMU, pimu_t, preint_IMU_callback);
 
+    SET_CALLBACK(DID_GROUND_VEHICLE, ground_vehicle_t, Ground_Vehicle_callback, 1);
+
+    SET_CALLBACK(DID_INFIELD_CAL, infield_cal_t, Infield_Cal_callback, 100);
+
     if (!firstrun)
     {
         data_streams_enabled_ = true;
@@ -761,7 +793,9 @@ void InertialSenseROS::configure_flash_parameters()
         current_flash_cfg.gpsTimeUserDelay != gpsTimeUserDelay_ ||
         // current_flash_cfg.magDeclination != magDeclination_ ||
         current_flash_cfg.insDynModel != insDynModel_ ||
-        current_flash_cfg.platformConfig != platformConfig_
+        current_flash_cfg.platformConfig != platformConfig_ ||
+        current_flash_cfg.sysCfgBits != sysCfgBits_ ||
+        current_flash_cfg.sensorConfig != sensorConfig_
         )
     {
         for (int i=0; i<3; i++)
@@ -781,9 +815,59 @@ void InertialSenseROS::configure_flash_parameters()
         current_flash_cfg.magDeclination = magDeclination_;
         current_flash_cfg.insDynModel = insDynModel_;
         current_flash_cfg.platformConfig = platformConfig_;
+        current_flash_cfg.sysCfgBits = sysCfgBits_;
+        current_flash_cfg.sensorConfig = sensorConfig_;
 
         IS_.SendData(DID_FLASH_CONFIG, (uint8_t *)(&current_flash_cfg), sizeof (nvm_flash_cfg_t), 0);
     }
+
+    msg_flash_config.size = current_flash_cfg.size;
+    msg_flash_config.checksum = current_flash_cfg.checksum;
+    msg_flash_config.key = current_flash_cfg.key;
+    msg_flash_config.startupImuDtMs = current_flash_cfg.startupImuDtMs;
+    msg_flash_config.startupNavDtMs = current_flash_cfg.startupNavDtMs;
+    msg_flash_config.ser0BaudRate = current_flash_cfg.ser0BaudRate;
+    msg_flash_config.ser1BaudRate = current_flash_cfg.ser1BaudRate;
+    msg_flash_config.insDynModel = current_flash_cfg.insDynModel;
+    msg_flash_config.debug = current_flash_cfg.debug;
+    msg_flash_config.gnssSatSigConst = current_flash_cfg.gnssSatSigConst;
+    msg_flash_config.sysCfgBits = current_flash_cfg.sysCfgBits;
+    msg_flash_config.lastLlaTimeOfWeekMs = current_flash_cfg.lastLlaTimeOfWeekMs;
+    msg_flash_config.lastLlaWeek = current_flash_cfg.lastLlaWeek;
+    msg_flash_config.lastLlaUpdateDistance = current_flash_cfg.lastLlaUpdateDistance;
+    msg_flash_config.ioConfig = current_flash_cfg.ioConfig;
+    msg_flash_config.platformConfig = current_flash_cfg.platformConfig;
+    msg_flash_config.gpsTimeUserDelay = current_flash_cfg.gpsTimeUserDelay;
+    msg_flash_config.magDeclination = current_flash_cfg.magDeclination;
+    msg_flash_config.gpsTimeSyncPeriodMs = current_flash_cfg.gpsTimeSyncPeriodMs;
+    msg_flash_config.startupGPSDtMs = current_flash_cfg.startupGPSDtMs;
+    msg_flash_config.RTKCfgBits = current_flash_cfg.RTKCfgBits;
+    msg_flash_config.sensorConfig = current_flash_cfg.sensorConfig;
+    msg_flash_config.gpsMinimumElevation = current_flash_cfg.gpsMinimumElevation;
+    msg_flash_config.ser2BaudRate = current_flash_cfg.ser2BaudRate;
+    for(size_t i = 0; i < 3; i++)
+    {
+        msg_flash_config.insRotation[i] = current_flash_cfg.insRotation[i];
+        msg_flash_config.insOffset[i] = current_flash_cfg.insOffset[i];
+        msg_flash_config.gps1AntOffset[i] = current_flash_cfg.gps1AntOffset[i];
+        msg_flash_config.refLla[i] = current_flash_cfg.refLla[i];
+        msg_flash_config.lastLla[i] = current_flash_cfg.lastLla[i];
+        msg_flash_config.gps2AntOffset[i] = current_flash_cfg.gps2AntOffset[i];
+        msg_flash_config.zeroVelRotation[i] = current_flash_cfg.zeroVelRotation[i];
+        msg_flash_config.zeroVelOffset[i] = current_flash_cfg.zeroVelOffset[i];
+    }
+    msg_flash_config.wheelConfig.bits = current_flash_cfg.wheelConfig.bits;
+    for(size_t i = 0; i < 3; i++)
+    {
+        msg_flash_config.wheelConfig.transform.e_b2w[i] = current_flash_cfg.wheelConfig.transform.e_b2w[i];
+        msg_flash_config.wheelConfig.transform.e_b2w_sigma[i] = current_flash_cfg.wheelConfig.transform.e_b2w_sigma[i];
+        msg_flash_config.wheelConfig.transform.t_b2w[i] = current_flash_cfg.wheelConfig.transform.t_b2w[i];
+        msg_flash_config.wheelConfig.transform.t_b2w_sigma[i] = current_flash_cfg.wheelConfig.transform.t_b2w_sigma[i];
+    }
+    msg_flash_config.wheelConfig.track_width = current_flash_cfg.wheelConfig.track_width;
+    msg_flash_config.wheelConfig.radius = current_flash_cfg.wheelConfig.radius;
+
+    rs_.flash_config.pub.publish(msg_flash_config);
 
     if  (reboot)
     {
@@ -2360,7 +2444,82 @@ bool InertialSenseROS::sysCommand_srv_callback(inertial_sense_ros::SystemCommand
     sysCommand.command = req.sysCommand;
     sysCommand.invCommand = ~req.sysCommand;
     IS_.SendData(DID_SYS_CMD, reinterpret_cast<uint8_t *>(&sysCommand), sizeof(system_command_t), 0);
+    res.message = "";
+    res.success = true;
     return true;
+}
+
+bool InertialSenseROS::groundVehicleCommand_srv_callback(inertial_sense_ros::GroundVehicleCommand::Request &req, inertial_sense_ros::GroundVehicleCommand::Response &res)
+{
+    // send ground vehicle command
+    uint8_t buff[4];
+    buff[0] = (req.mode >> 0) & 0xFF;
+    buff[1] = (req.mode >> 8) & 0xFF;
+    buff[2] = (req.mode >> 16) & 0xFF;
+    buff[3] = (req.mode >> 24) & 0xFF;
+    IS_.SendData(DID_GROUND_VEHICLE, buff, sizeof(buff), 0);
+    res.message = "";
+    res.success = true;
+    return true;
+}
+
+void InertialSenseROS::Ground_Vehicle_callback(eDataIDs DID, const ground_vehicle_t *const msg)
+{
+    msg_ground_vehicle.timeOfWeekMs = msg->timeOfWeekMs;
+    msg_ground_vehicle.status = msg->status;
+    msg_ground_vehicle.mode = msg->mode;
+    rs_.ground_vehicle.pub.publish(msg_ground_vehicle);
+}
+
+bool InertialSenseROS::infieldCalCommand_srv_callback(inertial_sense_ros::InfieldCalCommand::Request &req, inertial_sense_ros::InfieldCalCommand::Response &res)
+{
+    // send infield cal command
+    uint8_t buff[4];
+    buff[0] = (req.state >> 0) & 0xFF;
+    buff[1] = (req.state >> 8) & 0xFF;
+    buff[2] = (req.state >> 16) & 0xFF;
+    buff[3] = (req.state >> 24) & 0xFF;
+    IS_.SendData(DID_INFIELD_CAL, buff, sizeof(buff), 0);
+    res.message = "";
+    res.success = true;
+    return true;
+}
+
+void InertialSenseROS::Infield_Cal_callback(eDataIDs DID, const infield_cal_t *const msg)
+{
+    msg_infield_cal.state = msg->state;
+    msg_infield_cal.status = msg->status;
+    msg_infield_cal.sampleTimeMs = msg->sampleTimeMs;
+    if(msg_infield_cal.imu.size() != NUM_IMU_DEVICES)
+       msg_infield_cal.imu.resize(NUM_IMU_DEVICES);
+    for(size_t i = 0; i < msg_infield_cal.imu.size(); i++)
+    {
+        for(size_t j = 0; j < 3; j++)
+        {
+            msg_infield_cal.imu[i].pqr[j] = msg->imu[i].pqr[j];
+            msg_infield_cal.imu[i].acc[j] = msg->imu[i].acc[j];
+        }
+    }
+    for(size_t i = 0; i < 3; i++)
+    {
+        msg_infield_cal.calData[i].down.yaw = msg->calData[i].down.yaw;
+        if(msg_infield_cal.calData[i].down.dev.size() != NUM_IMU_DEVICES)
+           msg_infield_cal.calData[i].down.dev.resize(NUM_IMU_DEVICES);
+        for(size_t j = 0; j < msg_infield_cal.calData[i].down.dev.size(); j++)
+        {
+           for(size_t k = 0; k < 3; k++)
+               msg_infield_cal.calData[i].down.dev[j].acc[k] = msg->calData[i].down.dev[j].acc[k];
+        }
+        msg_infield_cal.calData[i].up.yaw = msg->calData[i].up.yaw;
+        if(msg_infield_cal.calData[i].up.dev.size() != NUM_IMU_DEVICES)
+           msg_infield_cal.calData[i].up.dev.resize(NUM_IMU_DEVICES);
+        for(size_t j = 0; j < msg_infield_cal.calData[i].up.dev.size(); j++)
+        {
+           for(size_t k = 0; k < 3; k++)
+               msg_infield_cal.calData[i].up.dev[j].acc[k] = msg->calData[i].up.dev[j].acc[k];
+        }
+    }
+    rs_.infield_cal.pub.publish(msg_infield_cal);
 }
 
 ros::Time InertialSenseROS::ros_time_from_week_and_tow(const uint32_t week, const double timeOfWeek)
