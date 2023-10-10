@@ -113,12 +113,14 @@ INFIELD_CAL_STATUS_MOTION_DETECTED                  = 0x20000000   # System is n
 
 ##############################
 
+ground_vehicle_status_timestamp = None
+ground_vehicle_mode_timestamp = None
+
 def cbGroundVehicle(msg):
-    global ground_vehicle_show, ground_vehicle_status, ground_vehicle_mode
-    if not ground_vehicle_show:
-        return
+    global ground_vehicle_show, ground_vehicle_status, ground_vehicle_mode, ground_vehicle_status_timestamp, ground_vehicle_mode_timestamp
     s = ''
-    if ground_vehicle_status is None or ground_vehicle_status != msg.status:
+    if ground_vehicle_status is None or ground_vehicle_status != msg.status or \
+        (ground_vehicle_status_timestamp is not None and rospy.get_time() >= ground_vehicle_status_timestamp + 5.0):
         ground_vehicle_status = msg.status
         status_str = ''
         if msg.status & GV_STATUS_LEARNING_ENABLED:
@@ -133,7 +135,9 @@ def cbGroundVehicle(msg):
             status_str += 'LEARNING_NEEDED, '
         status_str = status_str[:-2]
         s += f'ground_vehicle status: {ground_vehicle_status} ({status_str})\n'
-    if ground_vehicle_mode is None or ground_vehicle_mode != msg.mode:
+        ground_vehicle_status_timestamp = rospy.get_time()
+    if ground_vehicle_mode is None or ground_vehicle_mode != msg.mode or \
+        (ground_vehicle_mode_timestamp is not None and rospy.get_time() >= ground_vehicle_mode_timestamp + 5.0):
         ground_vehicle_mode = msg.mode
         mode_str = ''
         if msg.mode == GV_MODE_STANDBY:
@@ -152,15 +156,18 @@ def cbGroundVehicle(msg):
             mode_str += 'LEARNING_CANCEL, '
         mode_str = mode_str[:-2]
         s += f'ground_vehicle mode: {ground_vehicle_mode} ({mode_str})\n'
+        ground_vehicle_mode_timestamp = rospy.get_time()
     if ground_vehicle_show and len(s) > 0:
         print(s, end='\n')
 
+infield_cal_state_timestamp = None
+infield_cal_status_timestamp = None
+
 def cbInfieldCal(msg):
-    global infield_cal_show, infield_cal_state, infield_cal_status
-    if not infield_cal_show:
-        return
+    global infield_cal_show, infield_cal_state, infield_cal_status, infield_cal_state_timestamp, infield_cal_status_timestamp
     s = ''
-    if infield_cal_state is None or infield_cal_state != msg.state:
+    if infield_cal_state is None or infield_cal_state != msg.state or \
+        (infield_cal_state_timestamp is not None and rospy.get_time() >= infield_cal_state_timestamp + 5.0):
         infield_cal_state = msg.state
         state_str = ''
         if msg.state == INFIELD_CAL_STATE_CMD_OFF:
@@ -207,7 +214,9 @@ def cbInfieldCal(msg):
             state_str += 'ERROR_POOR_CAL_FIT, '
         state_str = state_str[:-2]
         s += f'infield_cal state: {infield_cal_state} ({state_str})\n'
-    if infield_cal_status is None or infield_cal_status != msg.status:
+        infield_cal_state_timestamp = rospy.get_time()
+    if infield_cal_status is None or infield_cal_status != msg.status or \
+        (infield_cal_status_timestamp is not None and rospy.get_time() >= infield_cal_status_timestamp + 5.0):
         infield_cal_status = msg.status
         status_str = ''
         for offset in [INFIELD_CAL_STATUS_SAMPLE_X_OFFSET, INFIELD_CAL_STATUS_SAMPLE_Y_OFFSET, INFIELD_CAL_STATUS_SAMPLE_Z_OFFSET]:
@@ -250,6 +259,7 @@ def cbInfieldCal(msg):
             status_str += 'MOTION_DETECTED, '
         status_str = status_str[:-2]
         #s += f'infield_cal status: {infield_cal_status} ({status_str})\n'
+        infield_cal_status_timestamp = rospy.get_time()
     if infield_cal_show and len(s) > 0:
         print(s, end='\n')
 
@@ -259,11 +269,6 @@ def sendGroundVehicleCommand(mode):
     resp = ground_vehicle_command(mode)
     if resp.message != '':
         print(f'sendGroundVehicleCommand: {resp.message}')
-    if resp.success:
-        if mode == GV_CMD_LEARNING_STOP_AND_SAVE or mode == GV_CMD_LEARNING_CANCEL:
-            ground_vehicle_show = False
-        else:
-            ground_vehicle_show = True
     return resp.success
 
 def sendInfieldCalCommand(state):
@@ -274,11 +279,6 @@ def sendInfieldCalCommand(state):
     resp = infield_cal_command(state)
     if resp.message != '':
         print(f'sendInfieldCalCommand: {resp.message}')
-    if resp.success:
-        if state == INFIELD_CAL_STATE_CMD_OFF or state == INFIELD_CAL_STATE_CMD_SAVE_AND_FINISH:
-            infield_cal_show = False
-        else:
-            infield_cal_show = True
     return resp.success
 
 def isData():
@@ -322,6 +322,7 @@ Ground Vehicle Learning Menu:
 #"""
 
 def main():
+    global ground_vehicle_show, infield_cal_show
     rospy.init_node('inertial_sense_calibration_tool')
     rospy.Subscriber('/inertial_sense/ground_vehicle', GroundVehicle, cbGroundVehicle)
     rospy.Subscriber('/inertial_sense/infield_cal', InfieldCal, cbInfieldCal)
@@ -360,10 +361,14 @@ def main():
                                 exit_loop = True
                             if value == 'Back to Main Menu':
                                 menu_selected = 'top-level'
+                                ground_vehicle_show = False
+                                infield_cal_show = False
                             if value == 'Run Infield Calibration':
                                 menu_selected = 'top-level-infield-cal'
+                                infield_cal_show = True
                             if value == 'Run Ground Vehicle Learning':
                                 menu_selected = 'top-level-ground-vehicle'
+                                ground_vehicle_show = True
                             if menu_selected == 'top-level-infield-cal':
                                 if value == 'Off':
                                     sendInfieldCalCommand(INFIELD_CAL_STATE_CMD_OFF)

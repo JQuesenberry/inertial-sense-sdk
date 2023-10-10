@@ -2465,7 +2465,7 @@ bool InertialSenseROS::groundVehicleCommand_srv_callback(inertial_sense_ros::Gro
     buff[1] = (req.mode >> 8) & 0xFF;
     buff[2] = (req.mode >> 16) & 0xFF;
     buff[3] = (req.mode >> 24) & 0xFF;
-    IS_.SendData(DID_GROUND_VEHICLE, buff, sizeof(buff), 0);
+    IS_.SendData(DID_GROUND_VEHICLE, buff, sizeof(buff), 8);
     res.message = "";
     res.success = true;
     return true;
