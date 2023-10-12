@@ -110,6 +110,7 @@ public:
 
     void initializeIS(bool configFlashParameters = true);
     void initializeROS();
+    bool ros_initialized_ = false;
     void initialize(bool configFlashParameters = true);
     void terminate();
 

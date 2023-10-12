@@ -214,6 +214,8 @@ void InertialSenseROS::initializeROS() {
     rs_.gps2_status.pub = nh_.advertise<inertial_sense_ros::GPSStatus>(rs_.gps2_status.topic, 1, true);
 
     data_stream_timer_ = nh_.createTimer(ros::Duration(1), configure_data_streams, this);
+
+    ros_initialized_ = true;
 }
 
 void InertialSenseROS::load_params(YAML::Node &node)
@@ -875,7 +877,8 @@ void InertialSenseROS::configure_flash_parameters()
     msg_flash_config.wheelConfig.track_width = current_flash_cfg.wheelConfig.track_width;
     msg_flash_config.wheelConfig.radius = current_flash_cfg.wheelConfig.radius;
 
-    rs_.flash_config.pub.publish(msg_flash_config);
+    if(ros_initialized_)
+        rs_.flash_config.pub.publish(msg_flash_config);
 
     if  (reboot)
     {
