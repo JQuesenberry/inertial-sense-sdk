@@ -101,6 +101,8 @@ void InertialSenseROS::initializeIS(bool configFlashParameters) {
         configure_rtk();
         IS_.SavePersistent();
 
+        sleep(1);
+
         if (configFlashParameters)
         {   // Set IMX flash parameters (flash write) after everything else so processor stall doesn't interfere with communications.
             configure_flash_parameters();
@@ -830,6 +832,14 @@ void InertialSenseROS::configure_flash_parameters()
 
         IS_.SendData(DID_FLASH_CONFIG, (uint8_t *)(&current_flash_cfg), sizeof (nvm_flash_cfg_t), 0);
     }
+
+    comManagerGetData(0, DID_FLASH_CONFIG, 0, 0, 0);
+
+    for (int i=0; i<100; i++)
+        comManagerStep();
+
+    IS_.GetFlashConfig(current_flash_cfg);
+    //ROS_INFO("InertialSenseROS: Configuring flash: \nCurrent: %i, \nDesired: %i\n", current_flash_cfg.ioConfig, ioConfig_);
 
     msg_flash_config.size = current_flash_cfg.size;
     msg_flash_config.checksum = current_flash_cfg.checksum;
