@@ -418,7 +418,11 @@ def main():
         termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
 
 if __name__ == '__main__':
+    semaphore_file = '/tmp/.cal_tool_active'
+    f = open(semaphore_file, 'w')
     try:
         main()
     except rospy.ROSInterruptException:
         pass
+    f.close()
+    os.remove(semaphore_file)
