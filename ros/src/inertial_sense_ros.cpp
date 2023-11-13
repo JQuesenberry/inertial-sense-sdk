@@ -265,6 +265,7 @@ void InertialSenseROS::load_params(YAML::Node &node)
 
     ph.nodeParam("mag_declination", magDeclination_);
     ph.nodeParamVec("ref_lla", 3, refLla_);
+    ph.nodeParam("ref_lla_set_current_on_start", ref_lla_set_current_on_start_, false);
     ph.nodeParam("publishTf", publishTf_);
     ph.nodeParam("platformConfig", platformConfig_);
     ph.nodeParam("sysCfgBits", sysCfgBits_, 0x00000004);
@@ -833,7 +834,7 @@ void InertialSenseROS::configure_flash_parameters()
         IS_.SendData(DID_FLASH_CONFIG, (uint8_t *)(&current_flash_cfg), sizeof (nvm_flash_cfg_t), 0);
     }
 
-    comManagerGetData(0, DID_FLASH_CONFIG, 0, 0, 0);
+    comManagerGetData(0, DID_FLASH_CONFIG, 0, 0, 1);
 
     for (int i=0; i<100; i++)
         comManagerStep();
@@ -841,6 +842,19 @@ void InertialSenseROS::configure_flash_parameters()
     IS_.GetFlashConfig(current_flash_cfg);
     //ROS_INFO("InertialSenseROS: Configuring flash: \nCurrent: %i, \nDesired: %i\n", current_flash_cfg.ioConfig, ioConfig_);
 
+    publish_flash_config(current_flash_cfg);
+
+    comManagerGetData(0, DID_FLASH_CONFIG, 0, 0, 0);
+
+    if  (reboot)
+    {
+        sleep(3);
+        reset_device();
+    }
+}
+
+void InertialSenseROS::publish_flash_config(const nvm_flash_cfg_t &current_flash_cfg)
+{
     msg_flash_config.size = current_flash_cfg.size;
     msg_flash_config.checksum = current_flash_cfg.checksum;
     msg_flash_config.key = current_flash_cfg.key;
@@ -889,12 +903,6 @@ void InertialSenseROS::configure_flash_parameters()
 
     if(ros_initialized_)
         rs_.flash_config.pub.publish(msg_flash_config);
-
-    if  (reboot)
-    {
-        sleep(3);
-        reset_device();
-    }
 }
 
 // FIXME:: THIS SHOULD BE IN RtkBaseCorrectionProvider_Ntrip
@@ -1058,7 +1066,7 @@ void InertialSenseROS::flash_config_callback(eDataIDs DID, const nvm_flash_cfg_t
     refLla_[1] = msg->refLla[1];
     refLla_[2] = msg->refLla[2];
     refLLA_known = true;
-    ROS_DEBUG("InertialSenseROS: refLla was set");
+    //ROS_DEBUG("InertialSenseROS: refLla was set");
 }
 
 void InertialSenseROS::INS1_callback(eDataIDs DID, const ins_1_t *const msg)
@@ -1644,6 +1652,18 @@ void InertialSenseROS::GPS_pos_callback(eDataIDs DID, const gps_pos_t *const msg
     {
         GPS_week_ = msg->week;
         GPS_towOffset_ = msg->towOffset;
+
+        lla_[0] = msg->lla[0];
+        lla_[1] = msg->lla[1];
+        lla_[2] = msg->lla[2];
+
+        if (ref_lla_set_current_on_start_)
+        {
+            std_srvs::Trigger::Request req;
+            std_srvs::Trigger::Response res;
+            set_current_position_as_refLLA(req, res);
+            ref_lla_set_current_on_start_ = false;
+        }
 
         if (rs_.gps1_navsatfix.enabled)
         {
@@ -2304,18 +2324,13 @@ bool InertialSenseROS::set_current_position_as_refLLA(std_srvs::Trigger::Request
 
     comManagerGetData(0, DID_FLASH_CONFIG, 0, 0, 1);
 
-    int i = 0;
+    for (int i=0; i<100; i++)
+        comManagerStep();
+
     nvm_flash_cfg_t current_flash;
     IS_.GetFlashConfig(current_flash);
-    while (current_flash.refLla[0] == current_flash.refLla[0] && current_flash.refLla[1] == current_flash.refLla[1] && current_flash.refLla[2] == current_flash.refLla[2])
-    {
-        comManagerStep();
-        i++;
-        if (i > 100)
-        {
-            break;
-        }
-    }
+
+    publish_flash_config(current_flash);
 
     if (current_lla_[0] == current_flash.refLla[0] && current_lla_[1] == current_flash.refLla[1] && current_lla_[2] == current_flash.refLla[2])
     {
@@ -2339,18 +2354,13 @@ bool InertialSenseROS::set_refLLA_to_value(inertial_sense_ros::refLLAUpdate::Req
 
     comManagerGetData(0, DID_FLASH_CONFIG, 0, 0, 1);
 
-    int i = 0;
+    for (int i=0; i<100; i++)
+        comManagerStep();
+
     nvm_flash_cfg_t current_flash;
     IS_.GetFlashConfig(current_flash);
-    while (current_flash.refLla[0] == current_flash.refLla[0] && current_flash.refLla[1] == current_flash.refLla[1] && current_flash.refLla[2] == current_flash.refLla[2])
-    {
-        comManagerStep();
-        i++;
-        if (i > 100)
-        {
-            break;
-        }
-    }
+
+    publish_flash_config(current_flash);
 
     if (req.lla[0] == current_flash.refLla[0] && req.lla[1] == current_flash.refLla[1] && req.lla[2] == current_flash.refLla[2])
     {

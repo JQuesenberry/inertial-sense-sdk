@@ -122,6 +122,7 @@ public:
     bool firmware_compatiblity_check();
     void set_navigation_dt_ms();
     void configure_flash_parameters();
+    void publish_flash_config(const nvm_flash_cfg_t &current_flash_cfg);
     void configure_rtk();
     void connect_rtk_client(RtkRoverCorrectionProvider_Ntrip& config);
     void start_rtk_server(RtkBaseCorrectionProvider_Ntrip& config);
@@ -432,6 +433,7 @@ public:
     float insRotation_[3] = {0, 0, 0};
     float insOffset_[3] = {0, 0, 0};
     double refLla_[3] = {0, 0, 0};      // Upload disabled if all zero
+    bool ref_lla_set_current_on_start_;
     float magDeclination_;
     int insDynModel_;
     bool refLLA_known = false;
