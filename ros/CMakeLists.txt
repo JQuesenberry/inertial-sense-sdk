@@ -6,6 +6,7 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
   std_msgs
+  std_msgs_stamped
   mavros_msgs
   gps_common
   sensor_msgs
@@ -64,6 +65,7 @@ add_service_files(
 generate_messages(
   DEPENDENCIES
   std_msgs
+  std_msgs_stamped
   mavros_msgs
   gps_common
   geometry_msgs

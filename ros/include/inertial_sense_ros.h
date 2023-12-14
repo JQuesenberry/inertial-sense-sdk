@@ -30,6 +30,7 @@
 #include "ParamHelper.h"
 #include "RtkBase.h"
 #include "RtkRover.h"
+#include "PpsHandler.h"
 
 #include "InertialSense.h"
 #include "ros/ros.h"
@@ -69,6 +70,7 @@
 #include "nav_msgs/Odometry.h"
 #include "std_srvs/Trigger.h"
 #include "std_msgs/Header.h"
+#include "std_msgs_stamped/TimeStamped.h"
 #include "geometry_msgs/Vector3Stamped.h"
 #include "geometry_msgs/PoseWithCovarianceStamped.h"
 #include "diagnostic_msgs/DiagnosticArray.h"
@@ -106,11 +108,15 @@ public:
     } NMEA_message_config_t;
 
     InertialSenseROS(YAML::Node paramNode = YAML::Node(YAML::NodeType::Undefined), bool configFlashParameters = true);
-    ~InertialSenseROS() { terminate(); }
+    ~InertialSenseROS()
+    {
+        if (pps_handler_ != NULL)
+            delete pps_handler_;
+        terminate();
+    }
 
     void initializeIS(bool configFlashParameters = true);
     void initializeROS();
-    bool ros_initialized_ = false;
     void initialize(bool configFlashParameters = true);
     void terminate();
 
@@ -149,6 +155,17 @@ public:
     int platformConfig_ = 0;
     int sysCfgBits_ = 0;
     int sensorConfig_ = 0;
+
+    enum
+    {
+        HEADER_TIMESTAMP_SRC_DEVICE,
+        HEADER_TIMESTAMP_SRC_SYSTEM,
+        HEADER_TIMESTAMP_SRC_SYSTEM_OFFSET,
+    } header_timestamp_source_;
+
+    std::string pps_dev_;
+    PPSHandler *pps_handler_ = NULL;
+    ros::Timer pps_handler_timer_;
 
     std::string frame_id_;
 
@@ -224,7 +241,7 @@ public:
 
     struct
     {
-    	ins_1_t ins1;
+        ins_1_t ins1;
     } did_;
 
     struct
@@ -271,6 +288,8 @@ public:
         TopicHelper infield_cal;
 
         TopicHelper flash_config;
+
+        TopicHelper device_time;
     } rs_;
 
     bool NavSatFixConfigured = false;
@@ -328,6 +347,8 @@ public:
         SERVICE_GALILEO = 0x8
     };
 
+    ros::Time ros_time_minus_local_to_device_time_offset(const ros::Time& now, const ros::Time& rostime);
+
     /**
      * @brief ros_time_from_week_and_tow
      * Get current ROS time from week and tow
@@ -335,6 +356,7 @@ public:
      * @param timeOfWeek Time of week (since Sunday morning) in seconds, GMT
      * @return equivalent ros::Time
      */
+    ros::Time ros_time_from_week_and_tow_base(const uint32_t week, const double timeOfWeek);
     ros::Time ros_time_from_week_and_tow(const uint32_t week, const double timeOfWeek);
 
     /**
@@ -420,6 +442,7 @@ public:
     inertial_sense_ros::GroundVehicle msg_ground_vehicle;
     inertial_sense_ros::InfieldCal msg_infield_cal;
     inertial_sense_ros::FlashConfig msg_flash_config;
+    std_msgs_stamped::TimeStamped msg_device_time;
 
     float poseCov_[36], twistCov_[36];
 
