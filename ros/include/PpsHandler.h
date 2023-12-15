@@ -20,10 +20,10 @@ class PPSHandlerInfo
     PPSHandlerInfo() :
         ref_time(0)
     {
-        assert_msg.header.frame_id = "system";
-        clear_msg.header.frame_id = "system";
-        pulse_msg.header.frame_id = "system";
-        local_to_device_time_offset_msg.header.frame_id = "system";
+        assert_msg.header.frame_id = "local";
+        clear_msg.header.frame_id = "local";
+        pulse_msg.header.frame_id = "local";
+        local_to_device_time_offset_msg.header.frame_id = "local";
     }
     void operator=(const PPSHandlerInfo& rhs)
     {
@@ -32,6 +32,7 @@ class PPSHandlerInfo
         pulse_msg = rhs.pulse_msg;
         local_to_device_time_offset_msg = rhs.local_to_device_time_offset_msg;
         ref_time = rhs.ref_time;
+        assert_hz = rhs.assert_hz;
     }
 
     std_msgs_stamped::TimeStamped assert_msg;
@@ -40,6 +41,8 @@ class PPSHandlerInfo
     std_msgs_stamped::Float64Stamped local_to_device_time_offset_msg;
 
     ros::Time ref_time;
+
+    double assert_hz;
 };
 
 class PPSHandler
@@ -247,6 +250,16 @@ class PPSHandler
                 info.local_to_device_time_offset_msg.header.stamp = info.assert_msg.header.stamp;
                 info.local_to_device_time_offset_msg.data = info.assert_msg.data.toSec() - assert_stamp.toSec();
                 local_to_device_time_offset_pub.publish(info.local_to_device_time_offset_msg);
+
+                while(assert_deltas.size() >= 10)
+                    assert_deltas.pop_front();
+                assert_deltas.push_back(assert_deltas.empty() ? 0 : assert_stamp.toSec() - assert_prev);
+                double tmp = 0;
+                for(const auto& it : assert_deltas)
+                    tmp += it;
+                info.assert_hz = 1.0 / (tmp / double(assert_deltas.size()));
+                assert_prev = assert_stamp.toSec();
+
                 #if 0
                 ROS_INFO("now: %f, assert: %f, ref_time: %f, ref_time_2: %f, offset: %f",
                     now.toSec(),
@@ -290,6 +303,9 @@ class PPSHandler
     ros::Publisher clear_pub;
     ros::Publisher pulse_pub;
     ros::Publisher local_to_device_time_offset_pub;
+
+    std::list<double> assert_deltas;
+    double assert_prev;
 
     std::mutex mtx;
 };

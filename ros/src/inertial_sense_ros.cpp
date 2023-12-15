@@ -182,6 +182,10 @@ void InertialSenseROS::initializeROS() {
       rs_.device_time.pub = nh_.advertise<std_msgs_stamped::TimeStamped>(rs_.device_time.topic, 1, true);
     }
 
+    if (rs_.transport_delay.enabled) {
+      rs_.transport_delay.pub = nh_.advertise<std_msgs_stamped::Float64Stamped>(rs_.transport_delay.topic, 1, true);
+    }
+
     if (RTK_rover_ && RTK_rover_->positioning_enable )
     {
         rs_.rtk_pos.pubInfo = nh_.advertise<inertial_sense_ros::RTKInfo>("RTK_pos/info", 10);
@@ -268,10 +272,10 @@ void InertialSenseROS::load_params(YAML::Node &node)
     std::transform(tmp.begin(), tmp.end(), tmp.begin(), [](unsigned char c){ return std::tolower(c); });
     if(tmp == "device")
         header_timestamp_source_ = HEADER_TIMESTAMP_SRC_DEVICE;
-    if(tmp == "system")
-        header_timestamp_source_ = HEADER_TIMESTAMP_SRC_SYSTEM;
-    if(tmp == "system_offset")
-        header_timestamp_source_ = HEADER_TIMESTAMP_SRC_SYSTEM_OFFSET;
+    if(tmp == "local")
+        header_timestamp_source_ = HEADER_TIMESTAMP_SRC_LOCAL;
+    if(tmp == "local_minus_transport")
+        header_timestamp_source_ = HEADER_TIMESTAMP_SRC_LOCAL_MINUS_TRANSPORT;
     msg_device_time.header.frame_id = tmp;
     ph.nodeParam("pps_dev", pps_dev_, "/dev/null");
     if(pps_dev_ != "/dev/null")
@@ -381,6 +385,9 @@ void InertialSenseROS::load_params(YAML::Node &node)
 
     YAML::Node deviceTime = ph.node(node, "device_time");
     ph.msgParams(rs_.device_time, "message", "device_time", true);
+
+    YAML::Node transportDelay = ph.node(node, "transport_delay");
+    ph.msgParams(rs_.transport_delay, "message", "transport_delay", true);
 
     YAML::Node evbNode = ph.node(node, "evb");
     ph.nodeParam("cb_preset", evb_.cb_preset, 2);        // 2=RS232(default), 3=XBee Radio On, 4=WiFi On & RS422, 5=SPI, 6=USB hub, 7=USB hub w/ RS422, 8=all off but USB
@@ -1690,11 +1697,20 @@ void InertialSenseROS::GPS_pos_callback(eDataIDs DID, const gps_pos_t *const msg
             pps_handler_->set_ref_time(ros::Time(sec, nsec));
         }
 
+        transport_delay_ = double_NaN;
+
         if (rs_.device_time.enabled)
         {
             msg_device_time.header.stamp = ros_time_from_week_and_tow(msg->week, msg->timeOfWeekMs / 1.0e3);
             msg_device_time.data = ros::Time(sec, nsec);
             rs_.device_time.pub.publish(msg_device_time);
+        }
+
+        if(!std::isnan(transport_delay_))
+        {
+            msg_transport_delay.header.stamp = ros_time_from_week_and_tow(msg->week, msg->timeOfWeekMs / 1.0e3);
+            msg_transport_delay.data = transport_delay_;
+            rs_.transport_delay.pub.publish(msg_transport_delay);
         }
 
         lla_[0] = msg->lla[0];
@@ -2619,6 +2635,7 @@ void InertialSenseROS::Infield_Cal_callback(eDataIDs DID, const infield_cal_t *c
 
 ros::Time InertialSenseROS::ros_time_minus_local_to_device_time_offset(const ros::Time& now, const ros::Time& rostime)
 {
+    transport_delay_ = 0;
     if(pps_handler_ == NULL)
         return now;
     PPSHandlerInfo pps_handler_info = pps_handler_->get_info();
@@ -2626,6 +2643,8 @@ ros::Time InertialSenseROS::ros_time_minus_local_to_device_time_offset(const ros
     ros::Time assert_time = pps_handler_info.assert_msg.header.stamp;
     double local_to_device_time_offset = pps_handler_info.local_to_device_time_offset_msg.data;
     if(ref_time.isZero() || assert_time.isZero())
+        return now;
+    if(fabs(1.0 - pps_handler_info.assert_hz) > 0.2)
         return now;
     #if 0
     ROS_INFO("now: %f, ref_time: %f, rostime: %f, assert: %f, local_to_device_time_offset: %f, new_time: %f",
@@ -2637,6 +2656,7 @@ ros::Time InertialSenseROS::ros_time_minus_local_to_device_time_offset(const ros
         rostime.toSec() - local_to_device_time_offset
     );
     #endif
+    transport_delay_ = now.toSec() - (rostime.toSec() - local_to_device_time_offset);
     return ros::Time(rostime.toSec() - local_to_device_time_offset);
 }
 
@@ -2673,9 +2693,9 @@ ros::Time InertialSenseROS::ros_time_from_week_and_tow(const uint32_t week, cons
 {
     ros::Time now = ros::Time::now();
     ros::Time rostime = ros_time_from_week_and_tow_base(week, timeOfWeek);
-    if(header_timestamp_source_ == HEADER_TIMESTAMP_SRC_SYSTEM)
+    if(header_timestamp_source_ == HEADER_TIMESTAMP_SRC_LOCAL)
         return now;
-    if(header_timestamp_source_ == HEADER_TIMESTAMP_SRC_SYSTEM_OFFSET)
+    if(header_timestamp_source_ == HEADER_TIMESTAMP_SRC_LOCAL_MINUS_TRANSPORT)
         return ros_time_minus_local_to_device_time_offset(now, rostime);
     return rostime;
 }
@@ -2708,9 +2728,9 @@ ros::Time InertialSenseROS::ros_time_from_start_time(const double time)
         // Publish with ROS time
         rostime = ros::Time(INS_local_offset_ + time);
     }
-    if(header_timestamp_source_ == HEADER_TIMESTAMP_SRC_SYSTEM)
+    if(header_timestamp_source_ == HEADER_TIMESTAMP_SRC_LOCAL)
         return now;
-    if(header_timestamp_source_ == HEADER_TIMESTAMP_SRC_SYSTEM_OFFSET)
+    if(header_timestamp_source_ == HEADER_TIMESTAMP_SRC_LOCAL_MINUS_TRANSPORT)
         return ros_time_minus_local_to_device_time_offset(now, rostime);
     return rostime;
 }
@@ -2719,9 +2739,9 @@ ros::Time InertialSenseROS::ros_time_from_tow(const double tow)
 {
     ros::Time now = ros::Time::now();
     ros::Time rostime = ros_time_from_week_and_tow_base(GPS_week_, tow);
-    if(header_timestamp_source_ == HEADER_TIMESTAMP_SRC_SYSTEM)
+    if(header_timestamp_source_ == HEADER_TIMESTAMP_SRC_LOCAL)
         return now;
-    if(header_timestamp_source_ == HEADER_TIMESTAMP_SRC_SYSTEM_OFFSET)
+    if(header_timestamp_source_ == HEADER_TIMESTAMP_SRC_LOCAL_MINUS_TRANSPORT)
         return ros_time_minus_local_to_device_time_offset(now, rostime);
     return rostime;
 }
@@ -2737,9 +2757,9 @@ ros::Time InertialSenseROS::ros_time_from_gtime(const uint64_t sec, double subse
     ros::Time rostime;
     rostime.sec = sec - LEAP_SECONDS;
     rostime.nsec = subsec * 1e9;
-    if(header_timestamp_source_ == HEADER_TIMESTAMP_SRC_SYSTEM)
+    if(header_timestamp_source_ == HEADER_TIMESTAMP_SRC_LOCAL)
         return now;
-    if(header_timestamp_source_ == HEADER_TIMESTAMP_SRC_SYSTEM_OFFSET)
+    if(header_timestamp_source_ == HEADER_TIMESTAMP_SRC_LOCAL_MINUS_TRANSPORT)
         return ros_time_minus_local_to_device_time_offset(now, rostime);
     return rostime;
 }

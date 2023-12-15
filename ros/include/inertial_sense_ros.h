@@ -70,6 +70,7 @@
 #include "nav_msgs/Odometry.h"
 #include "std_srvs/Trigger.h"
 #include "std_msgs/Header.h"
+#include "std_msgs_stamped/Float64Stamped.h"
 #include "std_msgs_stamped/TimeStamped.h"
 #include "geometry_msgs/Vector3Stamped.h"
 #include "geometry_msgs/PoseWithCovarianceStamped.h"
@@ -159,13 +160,15 @@ public:
     enum
     {
         HEADER_TIMESTAMP_SRC_DEVICE,
-        HEADER_TIMESTAMP_SRC_SYSTEM,
-        HEADER_TIMESTAMP_SRC_SYSTEM_OFFSET,
+        HEADER_TIMESTAMP_SRC_LOCAL,
+        HEADER_TIMESTAMP_SRC_LOCAL_MINUS_TRANSPORT,
     } header_timestamp_source_;
 
     std::string pps_dev_;
     PPSHandler *pps_handler_ = NULL;
     ros::Timer pps_handler_timer_;
+
+    double transport_delay_;
 
     std::string frame_id_;
 
@@ -290,6 +293,8 @@ public:
         TopicHelper flash_config;
 
         TopicHelper device_time;
+
+        TopicHelper transport_delay;
     } rs_;
 
     bool NavSatFixConfigured = false;
@@ -443,6 +448,7 @@ public:
     inertial_sense_ros::InfieldCal msg_infield_cal;
     inertial_sense_ros::FlashConfig msg_flash_config;
     std_msgs_stamped::TimeStamped msg_device_time;
+    std_msgs_stamped::Float64Stamped msg_transport_delay;
 
     float poseCov_[36], twistCov_[36];
 
