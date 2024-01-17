@@ -295,6 +295,7 @@ void InertialSenseROS::load_params(YAML::Node &node)
     ph.nodeParam("ref_lla_set_current_on_start", ref_lla_set_current_on_start_, false);
     ph.nodeParam("publishTf", publishTf_);
     ph.nodeParam("platformConfig", platformConfig_);
+    ph.nodeParam("gnssSatSigConst", gnssSatSigConst_, 0x13FF);
     ph.nodeParam("sysCfgBits", sysCfgBits_, 0x00000004);
     ph.nodeParam("sensorConfig", sensorConfig_, 0x0000000F);
 
@@ -838,6 +839,7 @@ void InertialSenseROS::configure_flash_parameters()
         // current_flash_cfg.magDeclination != magDeclination_ ||
         current_flash_cfg.insDynModel != insDynModel_ ||
         current_flash_cfg.platformConfig != platformConfig_ ||
+        current_flash_cfg.gnssSatSigConst != gnssSatSigConst_ ||
         current_flash_cfg.sysCfgBits != sysCfgBits_ ||
         current_flash_cfg.sensorConfig != sensorConfig_
         )
@@ -861,6 +863,7 @@ void InertialSenseROS::configure_flash_parameters()
         current_flash_cfg.magDeclination = magDeclination_;
         current_flash_cfg.insDynModel = insDynModel_;
         current_flash_cfg.platformConfig = platformConfig_;
+        current_flash_cfg.gnssSatSigConst = gnssSatSigConst_;
         current_flash_cfg.sysCfgBits = sysCfgBits_;
         current_flash_cfg.sensorConfig = sensorConfig_;
 
@@ -1735,12 +1738,13 @@ void InertialSenseROS::GPS_pos_callback(eDataIDs DID, const gps_pos_t *const msg
                 msg_NavSatFix.status.status = NavSatFixStatusFixType::STATUS_FIX;
             }
 
-            if (msg->status & GPS_STATUS_FIX_SBAS) // Check for SBAS only fix
+            if ((msg->status & GPS_STATUS_FIX_MASK) == GPS_STATUS_FIX_SBAS) // Check for SBAS only fix
             {
                 msg_NavSatFix.status.status = NavSatFixStatusFixType::STATUS_SBAS_FIX;
             }
 
-            if ((msg->status & GPS_STATUS_FIX_DGPS) || (msg->status & GPS_STATUS_FIX_MASK >= GPS_STATUS_FIX_RTK_SINGLE)) // Check for any RTK fix
+            if (((msg->status & GPS_STATUS_FIX_MASK) == GPS_STATUS_FIX_DGPS) ||
+                ((msg->status & GPS_STATUS_FIX_MASK) >= GPS_STATUS_FIX_RTK_SINGLE)) // Check for any RTK fix
             {
                 msg_NavSatFix.status.status = NavSatFixStatusFixType::STATUS_GBAS_FIX;
             }
@@ -1773,17 +1777,17 @@ void InertialSenseROS::GPS_pos_callback(eDataIDs DID, const gps_pos_t *const msg
                 msg_GpsFix.status.status = gps_common::GPSStatus::STATUS_FIX;
             }
 
-            if (msg->status & GPS_STATUS_FIX_SBAS) // Check for SBAS only fix
+            if ((msg->status & GPS_STATUS_FIX_MASK) == GPS_STATUS_FIX_SBAS) // Check for SBAS only fix
             {
                 msg_GpsFix.status.status = gps_common::GPSStatus::STATUS_SBAS_FIX;
             }
 
-            if (msg->status & GPS_STATUS_FIX_MASK >= GPS_STATUS_FIX_RTK_SINGLE) // Check for any RTK fix
+            if ((msg->status & GPS_STATUS_FIX_MASK) >= GPS_STATUS_FIX_RTK_SINGLE) // Check for any RTK fix
             {
                 msg_GpsFix.status.status = gps_common::GPSStatus::STATUS_GBAS_FIX;
             }
 
-            if (msg->status & GPS_STATUS_FIX_DGPS) // Check for DGPS fix
+            if ((msg->status & GPS_STATUS_FIX_MASK) == GPS_STATUS_FIX_DGPS) // Check for DGPS fix
             {
                 msg_GpsFix.status.status = gps_common::GPSStatus::STATUS_DGPS_FIX;
             }

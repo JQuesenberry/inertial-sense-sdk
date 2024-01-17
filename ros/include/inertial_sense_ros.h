@@ -154,6 +154,7 @@ public:
     bool covariance_enabled_;
     std::string log_directory_ = "";
     int platformConfig_ = 0;
+    int gnssSatSigConst_ = 0;
     int sysCfgBits_ = 0;
     int sensorConfig_ = 0;
 
