@@ -3,6 +3,7 @@
 import rospy
 
 import sys
+import os
 import select
 import tty
 import termios
