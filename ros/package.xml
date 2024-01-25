@@ -10,6 +10,9 @@
   <buildtool_depend>catkin</buildtool_depend>
   <depend>roscpp</depend>
   <depend>std_msgs</depend>
+  <depend>std_msgs_stamped</depend>
+  <depend>mavros_msgs</depend>
+  <depend>gps_common</depend>
   <depend>sensor_msgs</depend>
   <depend>geometry_msgs</depend>
   <depend>message_generation</depend>

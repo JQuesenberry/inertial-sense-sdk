@@ -20,6 +20,9 @@
 #define INERTIAL_SENSE_IMX_RTKROVER_H
 
 #include "ros/ros.h"
+#include "std_msgs/String.h"
+#include "std_msgs/UInt8MultiArray.h"
+#include "mavros_msgs/RTCM.h"
 
 #include "ParamHelper.h"
 
@@ -32,7 +35,7 @@ protected:
 public:
     std::string type_;
     std::string protocol_; // format
-    RtkRoverCorrectionProvider(YAML::Node& node, const std::string& t) : ph_(node), type_(t) { };
+    RtkRoverCorrectionProvider(YAML::Node& node, InertialSense* is_, ros::NodeHandle* nh_, const std::string& t) : ph_(node), is_(is_), nh_(nh_), type_(t) { };
     virtual void configure(YAML::Node& node) = 0;
 };
 
@@ -58,7 +61,7 @@ public:
     float connectivity_watchdog_timer_frequency_ = 1;
     ros::Timer connectivity_watchdog_timer_;
 
-    RtkRoverCorrectionProvider_Ntrip(YAML::Node& node) : RtkRoverCorrectionProvider(node, "ntrip") { configure(node); }
+    RtkRoverCorrectionProvider_Ntrip(YAML::Node& node, InertialSense* is_, ros::NodeHandle* nh_) : RtkRoverCorrectionProvider(node, is_, nh_, "ntrip") { configure(node); }
     void configure(YAML::Node& node);
     std::string get_connection_string();
     void connect_rtk_client();
@@ -72,21 +75,31 @@ class RtkRoverCorrectionProvider_Serial : public RtkRoverCorrectionProvider {
 public:
     std::string port_ = "/dev/ttyACM0";
     int baud_rate_ = 115200;
-    RtkRoverCorrectionProvider_Serial(YAML::Node& node) : RtkRoverCorrectionProvider(node, "serial") { configure(node); }
+    bool connecting_ = false;
+    int connection_attempt_limit_ = 1;
+    int connection_attempt_backoff_ = 2;
+    RtkRoverCorrectionProvider_Serial(YAML::Node& node, InertialSense* is_, ros::NodeHandle* nh_) : RtkRoverCorrectionProvider(node, is_, nh_, "serial") { configure(node); }
     virtual void configure(YAML::Node& node);
+    std::string get_connection_string();
+    void connect_rtk_client();
 };
 
 class RtkRoverCorrectionProvider_ROS : public RtkRoverCorrectionProvider {
 public:
     std::string topic_ = "/rtcm3_corrections";
-    RtkRoverCorrectionProvider_ROS(YAML::Node& node) : RtkRoverCorrectionProvider(node, "ros_topic"){ configure(node); }
+    std::string topic_datatype_ = "";
+    RtkRoverCorrectionProvider_ROS(YAML::Node& node, InertialSense* is_, ros::NodeHandle* nh_) : RtkRoverCorrectionProvider(node, is_, nh_, "ros_topic"){ configure(node); }
     virtual void configure(YAML::Node& node);
+    ros::Subscriber sub_;
+    void callback_std_msgs_String(const std_msgs::String::ConstPtr& msg);
+    void callback_std_msgs_UInt8MultiArray(const std_msgs::UInt8MultiArray::ConstPtr& msg);
+    void callback_mavros_msgs_RTCM(const mavros_msgs::RTCM::ConstPtr& msg);
 };
 
 class RtkRoverCorrectionProvider_EVB : public RtkRoverCorrectionProvider {
 public:
     std::string port_ = "xbee";
-    RtkRoverCorrectionProvider_EVB(YAML::Node &node) : RtkRoverCorrectionProvider(node, "evb") { configure(node); }
+    RtkRoverCorrectionProvider_EVB(YAML::Node &node, InertialSense* is_, ros::NodeHandle* nh_) : RtkRoverCorrectionProvider(node, is_, nh_, "evb") { configure(node); }
     virtual void configure(YAML::Node &node);
 };
 
@@ -103,20 +116,20 @@ public:
     bool positioning_enable = false;    // Enable RTK precision positioning at GPS1
 
     RtkRoverCorrectionProvider* correction_input;
-    RtkRoverProvider(YAML::Node node) : ph_((YAML::Node&)node) { configure(node); }
+    RtkRoverProvider(YAML::Node node, InertialSense* is_, ros::NodeHandle* nh_) : ph_((YAML::Node&)node), is_(is_), nh_(nh_) { configure(node); }
     void configure(YAML::Node& n);
 };
 
 class RtkRoverCorrectionProviderFactory {
 public:
-    static RtkRoverCorrectionProvider* buildCorrectionProvider(YAML::Node &node) {
+    static RtkRoverCorrectionProvider* buildCorrectionProvider(YAML::Node &node, InertialSense *is_, ros::NodeHandle *nh_) {
         if (node.IsDefined() && !node.IsNull()) {
             std::string type = node["type"].as<std::string>();
             std::transform(type.begin(), type.end(), type.begin(), ::tolower);
-            if (type == "ntrip") return new RtkRoverCorrectionProvider_Ntrip(node);
-            else if (type == "serial") return new RtkRoverCorrectionProvider_Serial(node);
-            else if (type == "evb") return new RtkRoverCorrectionProvider_EVB(node);
-            else if (type == "ros_topic") return new RtkRoverCorrectionProvider_ROS(node);
+            if (type == "ntrip") return new RtkRoverCorrectionProvider_Ntrip(node, is_, nh_);
+            else if (type == "serial") return new RtkRoverCorrectionProvider_Serial(node, is_, nh_);
+            else if (type == "ros_topic") return new RtkRoverCorrectionProvider_ROS(node, is_, nh_);
+            else if (type == "evb") return new RtkRoverCorrectionProvider_EVB(node, is_, nh_);
         } else {
             ROS_ERROR("Unable to configure RosRoverCorrectionProvider. The YAML node was null or undefined.");
         }

@@ -23,12 +23,14 @@
 #include <algorithm>
 #include <string>
 #include <cstdlib>
+#include <limits>
 #include <yaml-cpp/yaml.h>
 
 #include "TopicHelper.h"
 #include "ParamHelper.h"
 #include "RtkBase.h"
 #include "RtkRover.h"
+#include "PpsHandler.h"
 
 #include "InertialSense.h"
 #include "ros/ros.h"
@@ -38,12 +40,16 @@
 #include "sensor_msgs/FluidPressure.h"
 #include "sensor_msgs/JointState.h"
 #include "sensor_msgs/NavSatFix.h"
+#include "gps_common/GPSFix.h"
 #include "inertial_sense_ros/GPS.h"
 #include "data_sets.h"
 #include "inertial_sense_ros/GPSInfo.h"
 #include "inertial_sense_ros/PIMU.h"
 #include "inertial_sense_ros/FirmwareUpdate.h"
 #include "inertial_sense_ros/refLLAUpdate.h"
+#include "inertial_sense_ros/SystemCommand.h"
+#include "inertial_sense_ros/GroundVehicleCommand.h"
+#include "inertial_sense_ros/InfieldCalCommand.h"
 #include "inertial_sense_ros/RTKRel.h"
 #include "inertial_sense_ros/RTKInfo.h"
 #include "inertial_sense_ros/GNSSEphemeris.h"
@@ -54,9 +60,18 @@
 #include "inertial_sense_ros/DID_INS2.h"
 #include "inertial_sense_ros/DID_INS1.h"
 #include "inertial_sense_ros/DID_INS4.h"
+#include "inertial_sense_ros/DevInfo.h"
+#include "inertial_sense_ros/FlashConfig.h"
+#include "inertial_sense_ros/INSStatusFlags.h"
+#include "inertial_sense_ros/HdwStatusFlags.h"
+#include "inertial_sense_ros/GPSStatus.h"
+#include "inertial_sense_ros/GroundVehicle.h"
+#include "inertial_sense_ros/InfieldCal.h"
 #include "nav_msgs/Odometry.h"
 #include "std_srvs/Trigger.h"
 #include "std_msgs/Header.h"
+#include "std_msgs_stamped/Float64Stamped.h"
+#include "std_msgs_stamped/TimeStamped.h"
 #include "geometry_msgs/Vector3Stamped.h"
 #include "geometry_msgs/PoseWithCovarianceStamped.h"
 #include "diagnostic_msgs/DiagnosticArray.h"
@@ -68,7 +83,7 @@
 #define LEAP_SECONDS 18           // GPS time does not have leap seconds, UNIX does (as of 1/1/2017 - next one is probably in 2020 sometime unless there is some crazy earthquake or nuclear blast)
 #define UNIX_TO_GPS_OFFSET (GPS_UNIX_OFFSET - LEAP_SECONDS)
 #define REPO_VERSION_MAJOR 1
-#define REPO_VERSION_MINOR 10   // The repo/firmware version should originate from git tag (like repositoryInfo.h used in EvalTool).  For now we set these manually.
+#define REPO_VERSION_MINOR 11   // The repo/firmware version should originate from git tag (like repositoryInfo.h used in EvalTool).  For now we set these manually.
 #define REPO_VERSION_REVIS 0
 
 #define SET_CALLBACK(DID, __type, __cb_fun, __periodmultiple)                               \
@@ -94,7 +109,12 @@ public:
     } NMEA_message_config_t;
 
     InertialSenseROS(YAML::Node paramNode = YAML::Node(YAML::NodeType::Undefined), bool configFlashParameters = true);
-    ~InertialSenseROS() { terminate(); }
+    ~InertialSenseROS()
+    {
+        if (pps_handler_ != NULL)
+            delete pps_handler_;
+        terminate();
+    }
 
     void initializeIS(bool configFlashParameters = true);
     void initializeROS();
@@ -109,6 +129,7 @@ public:
     bool firmware_compatiblity_check();
     void set_navigation_dt_ms();
     void configure_flash_parameters();
+    void publish_flash_config(const nvm_flash_cfg_t &current_flash_cfg);
     void configure_rtk();
     void connect_rtk_client(RtkRoverCorrectionProvider_Ntrip& config);
     void start_rtk_server(RtkBaseCorrectionProvider_Ntrip& config);
@@ -127,15 +148,32 @@ public:
     bool factory_reset_ = false;        // Apply factory reset on startup
 
     // Serial Port Configuration
-    std::vector<std::string> ports_;    // a collection of ports which will be attempted, in order until a connection is made
-    std::string port_;                  // the actual port we connected with
-    int baudrate_;                      // the baudrate to connect with
+    std::vector<std::string> ports_; // a collection of ports which will be attempted, in order until a connection is made
+    std::string port_; // the actual port we connected with
+    int baudrate_;  // the baudrate to connect with
 
     bool sdk_connected_ = false;
     bool log_enabled_ = false;
     bool covariance_enabled_;
+    std::string log_directory_ = "";
     int platformConfig_ = 0;
     bool setPlatformConfig_ = false;
+    int gnssSatSigConst_ = 0;
+    int sysCfgBits_ = 0;
+    int sensorConfig_ = 0;
+
+    enum
+    {
+        HEADER_TIMESTAMP_SRC_DEVICE,
+        HEADER_TIMESTAMP_SRC_LOCAL,
+        HEADER_TIMESTAMP_SRC_LOCAL_MINUS_TRANSPORT,
+    } header_timestamp_source_;
+
+    std::string pps_dev_;
+    PPSHandler *pps_handler_ = NULL;
+    ros::Timer pps_handler_timer_;
+
+    double transport_delay_;
 
     std::string frame_id_;
 
@@ -166,16 +204,8 @@ public:
     inertial_sense_ros::GNSSObsVec gps2_obs_Vec_;
     inertial_sense_ros::GNSSObsVec base_obs_Vec_;
 
-
     RtkRoverProvider* RTK_rover_;
     RtkBaseProvider* RTK_base_;
-
-    bool GNSS_Compass_ = false;
-
-    ros::Timer rtk_connectivity_watchdog_timer_;
-    void start_rtk_connectivity_watchdog_timer();
-    void stop_rtk_connectivity_watchdog_timer();
-    void rtk_connectivity_watchdog_timer_callback(const ros::TimerEvent &timer_event);
 
     void INS1_callback(eDataIDs DID, const ins_1_t *const msg);
     void INS2_callback(eDataIDs DID, const ins_2_t *const msg);
@@ -200,14 +230,15 @@ public:
     void GPS_geph_callback(eDataIDs DID, const geph_t *const msg);
     void RTK_Misc_callback(eDataIDs DID, const gps_rtk_misc_t *const msg);
     void RTK_Rel_callback(eDataIDs DID, const gps_rtk_rel_t *const msg);
-
+    void Ground_Vehicle_callback(eDataIDs DID, const ground_vehicle_t *const msg);
+    void Infield_Cal_callback(eDataIDs DID, const infield_cal_t *const msg);
 
     ros::NodeHandle nh_;
     ros::NodeHandle nh_private_;
 
     struct
     {
-    	ins_1_t ins1;
+        ins_1_t ins1;
     } did_;
 
     struct
@@ -219,6 +250,8 @@ public:
         TopicHelper odom_ins_ecef;
         TopicHelper odom_ins_enu;
         TopicHelper inl2_states;
+        TopicHelper ins_status_flags;
+        TopicHelper hdw_status_flags;
 
         TopicHelper imu;
         TopicHelper pimu;
@@ -229,7 +262,12 @@ public:
         TopicHelperGps gps1;
         TopicHelperGps gps2;
         TopicHelper gps1_navsatfix;
+        TopicHelper gps1_navsatfix_fused;
+        TopicHelper gps1_gpsfix;
+        TopicHelper gps1_gpsfix_fused;
         TopicHelper gps2_navsatfix;
+        TopicHelper gps1_status;
+        TopicHelper gps2_status;
         TopicHelper gps1_info;
         TopicHelper gps2_info;
         TopicHelperGpsRaw gps1_raw;
@@ -239,6 +277,18 @@ public:
         TopicHelperGpsRtk rtk_cmp;
 
         TopicHelper diagnostics;
+
+        TopicHelper dev_info;
+
+        TopicHelper ground_vehicle;
+
+        TopicHelper infield_cal;
+
+        TopicHelper flash_config;
+
+        TopicHelper device_time;
+
+        TopicHelper transport_delay;
     } rs_;
 
     bool NavSatFixConfigured = false;
@@ -256,11 +306,17 @@ public:
     ros::ServiceServer firmware_update_srv_;
     ros::ServiceServer refLLA_set_current_srv_;
     ros::ServiceServer refLLA_set_value_srv_;
+    ros::ServiceServer sysCommand_srv_;
+    ros::ServiceServer groundVehicleCommand_srv_;
+    ros::ServiceServer infieldCalCommand_srv_;
     bool set_current_position_as_refLLA(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
     bool set_refLLA_to_value(inertial_sense_ros::refLLAUpdate::Request &req, inertial_sense_ros::refLLAUpdate::Response &res);
     bool perform_mag_cal_srv_callback(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
     bool perform_multi_mag_cal_srv_callback(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
     bool update_firmware_srv_callback(inertial_sense_ros::FirmwareUpdate::Request &req, inertial_sense_ros::FirmwareUpdate::Response &res);
+    bool sysCommand_srv_callback(inertial_sense_ros::SystemCommand::Request &req, inertial_sense_ros::SystemCommand::Response &res);
+    bool groundVehicleCommand_srv_callback(inertial_sense_ros::GroundVehicleCommand::Request &req, inertial_sense_ros::GroundVehicleCommand::Response &res);
+    bool infieldCalCommand_srv_callback(inertial_sense_ros::InfieldCalCommand::Request &req, inertial_sense_ros::InfieldCalCommand::Response &res);
 
     void publishGPS1();
     void publishGPS2();
@@ -290,6 +346,8 @@ public:
         SERVICE_GALILEO = 0x8
     };
 
+    ros::Time ros_time_minus_local_to_device_time_offset(const ros::Time& now, const ros::Time& rostime);
+
     /**
      * @brief ros_time_from_week_and_tow
      * Get current ROS time from week and tow
@@ -297,6 +355,7 @@ public:
      * @param timeOfWeek Time of week (since Sunday morning) in seconds, GMT
      * @return equivalent ros::Time
      */
+    ros::Time ros_time_from_week_and_tow_base(const uint32_t week, const double timeOfWeek);
     ros::Time ros_time_from_week_and_tow(const uint32_t week, const double timeOfWeek);
 
     /**
@@ -387,6 +446,9 @@ public:
     inertial_sense_ros::GPS msg_gps1;
     inertial_sense_ros::GPS msg_gps2;
     sensor_msgs::NavSatFix msg_NavSatFix;
+    sensor_msgs::NavSatFix msg_NavSatFix_Fused;
+    gps_common::GPSFix msg_GpsFix;
+    gps_common::GPSFix msg_GpsFix_Fused;
     gps_pos_t gps1_pos;
     gps_pos_t gps2_pos;
     gps_vel_t gps1_vel;
@@ -395,7 +457,13 @@ public:
     geometry_msgs::Vector3Stamped gps2_velEcef;
     inertial_sense_ros::GPSInfo msg_gps1_info;
     inertial_sense_ros::GPSInfo msg_gps2_info;
-    
+    inertial_sense_ros::DevInfo msg_dev_info;
+    inertial_sense_ros::GroundVehicle msg_ground_vehicle;
+    inertial_sense_ros::InfieldCal msg_infield_cal;
+    inertial_sense_ros::FlashConfig msg_flash_config;
+    std_msgs_stamped::TimeStamped msg_device_time;
+    std_msgs_stamped::Float64Stamped msg_transport_delay;
+
     float poseCov_[36], twistCov_[36];
 
     // Connection to the uINS
@@ -406,9 +474,11 @@ public:
     // navigation_dt_ms, EKF update period.  uINS-3: 4  default, 1 max.  Use `msg/ins.../period` to reduce INS output data rate.
     int ins_nav_dt_ms_;
     float insRotation_[3] = {0, 0, 0};
+    bool setInsRotation_ = false;
     float insOffset_[3] = {0, 0, 0};
     double refLla_[3] = {0, 0, 0};      // Upload disabled if all zero
     bool refLLA_valid = false;
+    bool ref_lla_set_current_on_start_;
     float magDeclination_;
     int insDynModel_;
 
@@ -425,7 +495,14 @@ public:
         int cb_preset;
         int cb_options;
     } evb_ = {};
-    
+
+    uint32_t ins_status_prev = 0;
+    uint32_t hdw_status_prev = 0;
+    uint32_t gps1_status_prev = 0;
+    uint32_t gps2_status_prev = 0;
+    inertial_sense_ros::INSStatusFlags process_ins_status(const uint32_t& ins_status);
+    inertial_sense_ros::HdwStatusFlags process_hdw_status(const uint32_t& hdw_status);
+    inertial_sense_ros::GPSStatus process_gps_status(const uint32_t& gps_status);
 };
 
 

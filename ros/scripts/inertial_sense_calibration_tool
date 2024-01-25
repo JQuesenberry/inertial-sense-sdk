@@ -1,0 +1,428 @@
+#!/usr/bin/env python3
+
+import rospy
+
+import sys
+import select
+import tty
+import termios
+
+from inertial_sense_ros.msg import GroundVehicle, InfieldCal
+from inertial_sense_ros.srv import GroundVehicleCommand, InfieldCalCommand
+
+ground_vehicle_show = False
+ground_vehicle_status = None
+ground_vehicle_mode = None
+
+infield_cal_show = False
+infield_cal_state = None
+infield_cal_status = None
+infield_cal_disable_motion_detect = False
+infield_cal_disable_require_vertical = False
+
+##############################
+
+GV_MODE_STANDBY                         = 0
+GV_MODE_LEARNING                        = 1
+GV_CMD_LEARNING_START                   = 2    # Use provided transform and sigma
+GV_CMD_LEARNING_RESUME                  = 3    # Reset sigma values
+GV_CMD_LEARNING_CLEAR_AND_START         = 4    # Zero transform and reset sigma values
+GV_CMD_LEARNING_STOP_AND_SAVE           = 5
+GV_CMD_LEARNING_CANCEL                  = 6
+
+##############################
+
+## Kinematic learing is solving for the translation from IMU to wheel (wheel_config).
+GV_STATUS_LEARNING_ENABLED      = 0x00000001
+
+## Navigation is running without GPS input.
+GV_STATUS_DEAD_RECKONING        = 0x01000000
+
+## Vehicle kinematic parameters agree with GPS.
+GV_STATUS_KINEMATIC_CAL_GOOD    = 0x02000000
+
+## Vehicle kinematic learning has converged and is complete.
+GV_STATUS_LEARNING_CONVERGED    = 0x04000000
+
+## Vehicle kinematic learning data (wheel_config_t) is missing.
+GV_STATUS_LEARNING_NEEDED       = 0x08000000
+
+##############################
+
+## User Commands:
+INFIELD_CAL_STATE_CMD_OFF                           = 0
+
+## Initialization Commands.  Select one of the following to clear prior samples and set the mode.  Zero accels requires vertical alignment.  No motion is required for all unless disabled.
+INFIELD_CAL_STATE_CMD_INIT_ZERO_IMU                     = 1    # Zero accel and gyro biases.
+INFIELD_CAL_STATE_CMD_INIT_ZERO_GYRO                    = 2    # Zero only gyro  biases.
+INFIELD_CAL_STATE_CMD_INIT_ZERO_ACCEL                   = 3    # Zero only accel biases.
+INFIELD_CAL_STATE_CMD_INIT_ZERO_ATTITUDE                = 4    # Zero (level) INS attitude by adjusting INS rotation.
+INFIELD_CAL_STATE_CMD_INIT_ZERO_ATTITUDE_IMU            = 5    # Zero gyro and accel biases.  Zero (level) INS attitude by adjusting INS rotation.
+INFIELD_CAL_STATE_CMD_INIT_ZERO_ATTITUDE_GYRO           = 6    # Zero only gyro  biases.  Zero (level) INS attitude by adjusting INS rotation.
+INFIELD_CAL_STATE_CMD_INIT_ZERO_ATTITUDE_ACCEL          = 7    # Zero only accel biases.  Zero (level) INS attitude by adjusting INS rotation.
+INFIELD_CAL_STATE_CMD_INIT_OPTION_DISABLE_MOTION_DETECT     = 0x00010000   # Bitwise AND this with the above init commands to disable motion detection during sampling (allow for more tolerant sampling).
+INFIELD_CAL_STATE_CMD_INIT_OPTION_DISABLE_REQUIRE_VERTIAL   = 0x00020000   # Bitwise AND this with the above init commands to disable vertical alignment requirement for accelerometer bias calibration (allow for more tolerant sampling).
+
+## Sample and End Commands:
+INFIELD_CAL_STATE_CMD_START_SAMPLE                  = 8    # Initiate 5 second sensor sampling and averaging.  Run for each orientation and 180 degree yaw rotation.
+INFIELD_CAL_STATE_CMD_SAVE_AND_FINISH               = 9    # Run this command to compute and save results.  Must be run following INFIELD_CAL_STATE_CMD_START_SAMPLE.
+
+## Status: (read only)
+INFIELD_CAL_STATE_READY_FOR_SAMPLING                = 50   # System has been initialized and is waiting for user to intiate sampling.  User must send a command to exit this state.
+INFIELD_CAL_STATE_SAMPLING                          = 51   # System is averaging the IMU data.  Minimize all motion and vibration.
+INFIELD_CAL_STATE_RUN_BIT_AND_FINISH                = 52   # Follow up calibration zero with BIT and copy out IMU biases.
+INFIELD_CAL_STATE_SAVED_AND_FINISHED                = 53   # Calculations are complete and DID_INFIELD_CAL.imu holds the update IMU biases.  Updates are saved to flash.
+
+## Error Status: (read only)
+INFIELD_CAL_STATE_ERROR_NOT_INITIALIZED             = 100  # Init command (INFIELD_CAL_STATE_CMD_INIT_...) not set.
+INFIELD_CAL_STATE_ERROR_SAMPLE_ABORT_MOTION_DETECTED= 101  # Error: Motion detected. Sampling aborted.
+INFIELD_CAL_STATE_ERROR_SAMPLE_ABORT_NOT_VERTICAL   = 102  # Error: System not vertical. Sampling aborted.
+INFIELD_CAL_STATE_ERROR_NO_SAMPLES_COLLECTED        = 103  # Error: No samples have been collected
+INFIELD_CAL_STATE_ERROR_POOR_CAL_FIT                = 104  # Error: Calibration zero is not
+
+## Internal Use Only
+INFIELD_CAL_STATE_CMD_MASK                          = 0x0000FFFF
+INFIELD_CAL_STATE_CMD_START_SAMPLE_BIT              = 11   # Initiate 5 second sensor sample and averaging.  Does not save sample into cal data.
+
+##############################
+
+INFIELD_CAL_STATUS_AXIS_DN_GRAVITY                  = 0x00000001   # Axis points in direction of gravity more than any other axis.
+INFIELD_CAL_STATUS_AXIS_DN_SAMPLED                  = 0x00000002   # Sampled
+INFIELD_CAL_STATUS_AXIS_DN_SAMPLED_180              = 0x00000004   # Sampled based on average of two orientations with 180 degree delta yaw.
+INFIELD_CAL_STATUS_AXIS_UP_GRAVITY                  = 0x00000008   # Axis points in direction of gravity more than any other axis.
+INFIELD_CAL_STATUS_AXIS_UP_SAMPLED                  = 0x00000010   # Sampled
+INFIELD_CAL_STATUS_AXIS_UP_SAMPLED_180              = 0x00000020   # Sampled based on average of two orientations with 180 degree delta yaw.
+
+INFIELD_CAL_STATUS_SAMPLE_X_OFFSET                  = 0
+INFIELD_CAL_STATUS_SAMPLE_Y_OFFSET                  = 6
+INFIELD_CAL_STATUS_SAMPLE_Z_OFFSET                  = 12
+
+INFIELD_CAL_STATUS_AXIS_MASK                        = 0x0000003F
+INFIELD_CAL_STATUS_AXES_GRAVITY_MASK                = (((INFIELD_CAL_STATUS_AXIS_DN_GRAVITY|INFIELD_CAL_STATUS_AXIS_UP_GRAVITY)<<INFIELD_CAL_STATUS_SAMPLE_X_OFFSET) | ((INFIELD_CAL_STATUS_AXIS_DN_GRAVITY|INFIELD_CAL_STATUS_AXIS_UP_GRAVITY)<<INFIELD_CAL_STATUS_SAMPLE_Y_OFFSET) | ((INFIELD_CAL_STATUS_AXIS_DN_GRAVITY|INFIELD_CAL_STATUS_AXIS_UP_GRAVITY)<<INFIELD_CAL_STATUS_SAMPLE_Z_OFFSET) )
+
+INFIELD_CAL_STATUS_ENABLED_ZERO_ACCEL               = 0x00100000   # Zero accel bias.  Require vertical alignment for sampling.
+INFIELD_CAL_STATUS_ENABLED_ZERO_GYRO                = 0x00200000   # Zero gyro bias.
+INFIELD_CAL_STATUS_ENABLED_ZERO_ATTITUDE            = 0x00400000   # Zero (level) INS attitude by adjusting INS rotation.
+INFIELD_CAL_STATUS_ENABLED_MOTION_DETECT            = 0x00800000   # Require no motion during sampling.
+INFIELD_CAL_STATUS_ENABLED_NORMAL_MASK              = 0x00F00000
+INFIELD_CAL_STATUS_ENABLED_BIT                      = 0x01000000   # Used for BIT
+INFIELD_CAL_STATUS_DISABLED_REQUIRE_VERTICAL        = 0x02000000   # Do not require vertical alignment for accelerometer calibration.
+
+INFIELD_CAL_STATUS_AXIS_NOT_VERTICAL                = 0x10000000   # Axis is not aligned vertically and cannot be used for zero accel sampling.
+INFIELD_CAL_STATUS_MOTION_DETECTED                  = 0x20000000   # System is not stationary and cannot be used for infield calibration.
+
+##############################
+
+ground_vehicle_status_timestamp = None
+ground_vehicle_mode_timestamp = None
+
+def cbGroundVehicle(msg):
+    global ground_vehicle_show, ground_vehicle_status, ground_vehicle_mode, ground_vehicle_status_timestamp, ground_vehicle_mode_timestamp
+    s = ''
+    if ground_vehicle_status is None or ground_vehicle_status != msg.status or \
+        (ground_vehicle_status_timestamp is not None and rospy.get_time() >= ground_vehicle_status_timestamp + 5.0):
+        ground_vehicle_status = msg.status
+        status_str = ''
+        if msg.status & GV_STATUS_LEARNING_ENABLED:
+            status_str += 'LEARNING_ENABLED, '
+        if msg.status & GV_STATUS_DEAD_RECKONING:
+            status_str += 'DEAD_RECKONING, '
+        if msg.status & GV_STATUS_KINEMATIC_CAL_GOOD:
+            status_str += 'KINEMATIC_CAL_GOOD, '
+        if msg.status & GV_STATUS_LEARNING_CONVERGED:
+            status_str += 'LEARNING_CONVERGED, '
+        if msg.status & GV_STATUS_LEARNING_NEEDED:
+            status_str += 'LEARNING_NEEDED, '
+        status_str = status_str[:-2]
+        s += f'ground_vehicle status: {ground_vehicle_status} ({status_str})\n'
+        ground_vehicle_status_timestamp = rospy.get_time()
+    if ground_vehicle_mode is None or ground_vehicle_mode != msg.mode or \
+        (ground_vehicle_mode_timestamp is not None and rospy.get_time() >= ground_vehicle_mode_timestamp + 5.0):
+        ground_vehicle_mode = msg.mode
+        mode_str = ''
+        if msg.mode == GV_MODE_STANDBY:
+            mode_str += 'MODE_STANDBY, '
+        if msg.mode == GV_MODE_LEARNING:
+            mode_str += 'MODE_LEARNING, '
+        if msg.mode == GV_CMD_LEARNING_START:
+            mode_str += 'LEARNING_START, '
+        if msg.mode == GV_CMD_LEARNING_RESUME:
+            mode_str += 'LEARNING_RESUME, '
+        if msg.mode == GV_CMD_LEARNING_CLEAR_AND_START:
+            mode_str += 'LEARNING_CLEAR_AND_START, '
+        if msg.mode == GV_CMD_LEARNING_STOP_AND_SAVE:
+            mode_str += 'LEARNING_STOP_AND_SAVE, '
+        if msg.mode == GV_CMD_LEARNING_CANCEL:
+            mode_str += 'LEARNING_CANCEL, '
+        mode_str = mode_str[:-2]
+        s += f'ground_vehicle mode: {ground_vehicle_mode} ({mode_str})\n'
+        ground_vehicle_mode_timestamp = rospy.get_time()
+    if ground_vehicle_show and len(s) > 0:
+        print(s, end='\n')
+
+infield_cal_state_timestamp = None
+infield_cal_status_timestamp = None
+
+def cbInfieldCal(msg):
+    global infield_cal_show, infield_cal_state, infield_cal_status, infield_cal_state_timestamp, infield_cal_status_timestamp
+    s = ''
+    if infield_cal_state is None or infield_cal_state != msg.state or \
+        (infield_cal_state_timestamp is not None and rospy.get_time() >= infield_cal_state_timestamp + 5.0):
+        infield_cal_state = msg.state
+        state_str = ''
+        if msg.state == INFIELD_CAL_STATE_CMD_OFF:
+            state_str += 'CMD_OFF, '
+        if msg.state == INFIELD_CAL_STATE_CMD_INIT_ZERO_IMU:
+            state_str += 'CMD_INIT_ZERO_IMU, '
+        if msg.state == INFIELD_CAL_STATE_CMD_INIT_ZERO_GYRO:
+            state_str += 'CMD_INIT_ZERO_GYRO, '
+        if msg.state == INFIELD_CAL_STATE_CMD_INIT_ZERO_ACCEL:
+            state_str += 'CMD_INIT_ZERO_ACCEL, '
+        if msg.state == INFIELD_CAL_STATE_CMD_INIT_ZERO_ATTITUDE:
+            state_str += 'CMD_INIT_ZERO_ATTITUDE, '
+        if msg.state == INFIELD_CAL_STATE_CMD_INIT_ZERO_ATTITUDE_IMU:
+            state_str += 'CMD_INIT_ZERO_ATTITUDE_IMU, '
+        if msg.state == INFIELD_CAL_STATE_CMD_INIT_ZERO_ATTITUDE_GYRO:
+            state_str += 'CMD_INIT_ZERO_ATTITUDE_GYRO, '
+        if msg.state == INFIELD_CAL_STATE_CMD_INIT_ZERO_ATTITUDE_ACCEL:
+            state_str += 'CMD_INIT_ZERO_ATTITUDE_ACCEL, '
+        if msg.state & INFIELD_CAL_STATE_CMD_INIT_OPTION_DISABLE_MOTION_DETECT:
+            state_str += 'CMD_INIT_OPTION_DISABLE_MOTION_DETECT, '
+        if msg.state & INFIELD_CAL_STATE_CMD_INIT_OPTION_DISABLE_REQUIRE_VERTIAL:
+            state_str += 'CMD_INIT_OPTION_DISABLE_REQUIRE_VERTIAL, '
+        if msg.state == INFIELD_CAL_STATE_CMD_START_SAMPLE:
+            state_str += 'CMD_START_SAMPLE, '
+        if msg.state == INFIELD_CAL_STATE_CMD_SAVE_AND_FINISH:
+            state_str += 'CMD_SAVE_AND_FINISH, '
+        if msg.state == INFIELD_CAL_STATE_READY_FOR_SAMPLING:
+            state_str += 'READY_FOR_SAMPLING, '
+        if msg.state == INFIELD_CAL_STATE_SAMPLING:
+            state_str += 'SAMPLING, '
+        if msg.state == INFIELD_CAL_STATE_RUN_BIT_AND_FINISH:
+            state_str += 'RUN_BIT_AND_FINISH, '
+        if msg.state == INFIELD_CAL_STATE_SAVED_AND_FINISHED:
+            state_str += 'SAVED_AND_FINISHED, '
+        if msg.state == INFIELD_CAL_STATE_ERROR_NOT_INITIALIZED:
+            state_str += 'ERROR_NOT_INITIALIZED, '
+        if msg.state == INFIELD_CAL_STATE_ERROR_SAMPLE_ABORT_MOTION_DETECTED:
+            state_str += 'ERROR_SAMPLE_ABORT_MOTION_DETECTED, '
+        if msg.state == INFIELD_CAL_STATE_ERROR_SAMPLE_ABORT_NOT_VERTICAL:
+            state_str += 'ERROR_SAMPLE_ABORT_NOT_VERTICAL, '
+        if msg.state == INFIELD_CAL_STATE_ERROR_NO_SAMPLES_COLLECTED:
+            state_str += 'ERROR_NO_SAMPLES_COLLECTED, '
+        if msg.state == INFIELD_CAL_STATE_ERROR_POOR_CAL_FIT:
+            state_str += 'ERROR_POOR_CAL_FIT, '
+        state_str = state_str[:-2]
+        s += f'infield_cal state: {infield_cal_state} ({state_str})\n'
+        infield_cal_state_timestamp = rospy.get_time()
+    if infield_cal_status is None or infield_cal_status != msg.status or \
+        (infield_cal_status_timestamp is not None and rospy.get_time() >= infield_cal_status_timestamp + 5.0):
+        infield_cal_status = msg.status
+        status_str = ''
+        for offset in [INFIELD_CAL_STATUS_SAMPLE_X_OFFSET, INFIELD_CAL_STATUS_SAMPLE_Y_OFFSET, INFIELD_CAL_STATUS_SAMPLE_Z_OFFSET]:
+            axis = ''
+            if offset == INFIELD_CAL_STATUS_SAMPLE_X_OFFSET:
+                axis = 'X'
+            if offset == INFIELD_CAL_STATUS_SAMPLE_Y_OFFSET:
+                axis = 'Y'
+            if offset == INFIELD_CAL_STATUS_SAMPLE_Z_OFFSET:
+                axis = 'Z'
+            if msg.status & (INFIELD_CAL_STATUS_AXIS_DN_GRAVITY << offset):
+                status_str += f'{axis}_AXIS_DN_GRAVITY, '
+            if msg.status & (INFIELD_CAL_STATUS_AXIS_DN_SAMPLED << offset):
+                status_str += f'{axis}_AXIS_DN_SAMPLED, '
+            if msg.status & (INFIELD_CAL_STATUS_AXIS_DN_SAMPLED_180 << offset):
+                status_str += f'{axis}_AXIS_DN_SAMPLED_180, '
+            if msg.status & (INFIELD_CAL_STATUS_AXIS_UP_GRAVITY << offset):
+                status_str += f'{axis}_AXIS_UP_GRAVITY, '
+            if msg.status & (INFIELD_CAL_STATUS_AXIS_UP_SAMPLED << offset):
+                status_str += f'{axis}_AXIS_UP_SAMPLED, '
+            if msg.status & (INFIELD_CAL_STATUS_AXIS_UP_SAMPLED_180 << offset):
+                status_str += f'{axis}_AXIS_UP_SAMPLED_180, '
+        if msg.status & INFIELD_CAL_STATUS_ENABLED_ZERO_ACCEL:
+            status_str += 'ENABLED_ZERO_ACCEL, '
+        if msg.status & INFIELD_CAL_STATUS_ENABLED_ZERO_GYRO:
+            status_str += 'ENABLED_ZERO_GYRO, '
+        if msg.status & INFIELD_CAL_STATUS_ENABLED_ZERO_ATTITUDE:
+            status_str += 'ENABLED_ZERO_ATTITUDE, '
+        if msg.status & INFIELD_CAL_STATUS_ENABLED_MOTION_DETECT:
+            status_str += 'ENABLED_MOTION_DETECT, '
+        if msg.status & INFIELD_CAL_STATUS_ENABLED_NORMAL_MASK:
+            status_str += 'ENABLED_NORMAL_MASK, '
+        if msg.status & INFIELD_CAL_STATUS_ENABLED_BIT:
+            status_str += 'ENABLED_BIT, '
+        if msg.status & INFIELD_CAL_STATUS_DISABLED_REQUIRE_VERTICAL:
+            status_str += 'DISABLED_REQUIRE_VERTICAL, '
+        if msg.status & INFIELD_CAL_STATUS_AXIS_NOT_VERTICAL:
+            status_str += 'AXIS_NOT_VERTICAL, '
+        if msg.status & INFIELD_CAL_STATUS_MOTION_DETECTED:
+            status_str += 'MOTION_DETECTED, '
+        status_str = status_str[:-2]
+        #s += f'infield_cal status: {infield_cal_status} ({status_str})\n'
+        infield_cal_status_timestamp = rospy.get_time()
+    if infield_cal_show and len(s) > 0:
+        print(s, end='\n')
+
+def sendGroundVehicleCommand(mode):
+    global ground_vehicle_show
+    ground_vehicle_command = rospy.ServiceProxy('/inertial_sense/ground_vehicle_command', GroundVehicleCommand)
+    resp = ground_vehicle_command(mode)
+    if resp.message != '':
+        print(f'sendGroundVehicleCommand: {resp.message}')
+    return resp.success
+
+def sendInfieldCalCommand(state):
+    global infield_cal_show
+    infield_cal_command = rospy.ServiceProxy('/inertial_sense/infield_cal_command', InfieldCalCommand)
+    state = state | (INFIELD_CAL_STATE_CMD_INIT_OPTION_DISABLE_MOTION_DETECT if infield_cal_disable_motion_detect else 0)
+    state = state | (INFIELD_CAL_STATE_CMD_INIT_OPTION_DISABLE_REQUIRE_VERTIAL if infield_cal_disable_require_vertical else 0)
+    resp = infield_cal_command(state)
+    if resp.message != '':
+        print(f'sendInfieldCalCommand: {resp.message}')
+    return resp.success
+
+def isData():
+    return select.select([sys.stdin], [], [], 0) == ([sys.stdin], [], [])
+
+menus = {}
+menus['top-level'] = """
+Main Menu:
+1. Run Infield Calibration
+2. Run Ground Vehicle Learning
+3. Exit
+"""
+menus['top-level-infield-cal'] = """
+Infield Calibration Menu:
+1.  Off
+2.  Zero IMU
+3.  Zero Gyro
+4.  Zero Accel
+5.  Zero Attitude
+6.  Zero Attitude & IMU
+7.  Zero Attitude & Gyro
+8.  Zero Attitude & Accel
+9.  Start Sampling for 5 Seconds
+10. Save & Finish
+11. Toggle Motion Detect
+12. Toggle Require Vertical
+13. Back to Main Menu
+"""
+menus['top-level-ground-vehicle'] = """
+Ground Vehicle Learning Menu:
+1. Start
+2. Resume
+3. Clear & Start
+4. Stop & Save
+5. Cancel
+6. Back to Main Menu
+"""
+#menus['top-level'] = """
+#"""
+#menus['top-level'] = """
+#"""
+
+def main():
+    global ground_vehicle_show, infield_cal_show
+    rospy.init_node('inertial_sense_calibration_tool')
+    rospy.Subscriber('/inertial_sense/ground_vehicle', GroundVehicle, cbGroundVehicle)
+    rospy.Subscriber('/inertial_sense/infield_cal', InfieldCal, cbInfieldCal)
+    menu_selected = 'top-level'
+    menu = None
+    rate = rospy.Rate(10)
+    old_settings = termios.tcgetattr(sys.stdin)
+    try:
+        tty.setcbreak(sys.stdin.fileno())
+        buff = ''
+        exit_loop = False
+        while not exit_loop and not rospy.is_shutdown():
+            if menu is None or menu != menus[menu_selected]:
+                menu = menus[menu_selected]
+                print(menu)
+            if isData():
+                c = sys.stdin.read(1)
+                #print(f'c={c} (0x{ord(c):02x})')
+                print(c, end='', flush=True)
+                if c == '\x1b': # Escape
+                    break
+                buff += c
+                if c == '\x0a': # Enter
+                    buff = buff.strip()
+                    #print(buff)
+                    for line in menu.split('\n'):
+                        if line == '':
+                            continue
+                        try:
+                            key, value = line.split('. ')
+                            value = value.strip()
+                        except Exception as e:
+                            continue
+                        if key == buff:
+                            if value == 'Exit':
+                                exit_loop = True
+                            if value == 'Back to Main Menu':
+                                menu_selected = 'top-level'
+                                ground_vehicle_show = False
+                                infield_cal_show = False
+                            if value == 'Run Infield Calibration':
+                                menu_selected = 'top-level-infield-cal'
+                                infield_cal_show = True
+                            if value == 'Run Ground Vehicle Learning':
+                                menu_selected = 'top-level-ground-vehicle'
+                                ground_vehicle_show = True
+                            if menu_selected == 'top-level-infield-cal':
+                                if value == 'Off':
+                                    sendInfieldCalCommand(INFIELD_CAL_STATE_CMD_OFF)
+                                if value == 'Zero IMU':
+                                    sendInfieldCalCommand(INFIELD_CAL_STATE_CMD_INIT_ZERO_IMU)
+                                if value == 'Zero Gyro':
+                                    sendInfieldCalCommand(INFIELD_CAL_STATE_CMD_INIT_ZERO_GYRO)
+                                if value == 'Zero Accel':
+                                    sendInfieldCalCommand(INFIELD_CAL_STATE_CMD_INIT_ZERO_ACCEL)
+                                if value == 'Zero Attitude':
+                                    sendInfieldCalCommand(INFIELD_CAL_STATE_CMD_INIT_ZERO_ATTITUDE)
+                                if value == 'Zero Attitude & IMU':
+                                    sendInfieldCalCommand(INFIELD_CAL_STATE_CMD_INIT_ZERO_ATTITUDE_IMU)
+                                if value == 'Zero Attitude & Gyro':
+                                    sendInfieldCalCommand(INFIELD_CAL_STATE_CMD_INIT_ZERO_ATTITUDE_GYRO)
+                                if value == 'Zero Attitude & Accel':
+                                    sendInfieldCalCommand(INFIELD_CAL_STATE_CMD_INIT_ZERO_ATTITUDE_ACCEL)
+                                if value == 'Start Sampling for 5 Seconds':
+                                    sendInfieldCalCommand(INFIELD_CAL_STATE_CMD_START_SAMPLE)
+                                if value == 'Save & Finish':
+                                    sendInfieldCalCommand(INFIELD_CAL_STATE_CMD_SAVE_AND_FINISH)
+                                if value == 'Toggle Motion Detect':
+                                    global infield_cal_disable_motion_detect
+                                    infield_cal_disable_motion_detect = not infield_cal_disable_motion_detect
+                                    print(f'Disable Motion Detect Flag set to {infield_cal_disable_motion_detect}')
+                                if value == 'Toggle Require Vertical':
+                                    global infield_cal_disable_require_vertical
+                                    infield_cal_disable_require_vertical = not infield_cal_disable_require_vertical
+                                    print(f'Disable Require Vertical Flag set to {infield_cal_disable_require_vertical}')
+                            if menu_selected == 'top-level-ground-vehicle':
+                                if value == 'Start':
+                                    sendGroundVehicleCommand(GV_CMD_LEARNING_START)
+                                if value == 'Resume':
+                                    sendGroundVehicleCommand(GV_CMD_LEARNING_RESUME)
+                                if value == 'Clear & Start':
+                                    sendGroundVehicleCommand(GV_CMD_LEARNING_CLEAR_AND_START)
+                                if value == 'Stop & Save':
+                                    sendGroundVehicleCommand(GV_CMD_LEARNING_STOP_AND_SAVE)
+                                if value == 'Cancel':
+                                    sendGroundVehicleCommand(GV_CMD_LEARNING_CANCEL)
+                            if menu == menus[menu_selected]:
+                                print(menu)
+                            break
+                    buff = ''
+            rate.sleep()
+    finally:
+        termios.tcsetattr(sys.stdin, termios.TCSADRAIN, old_settings)
+
+if __name__ == '__main__':
+    semaphore_file = '/tmp/.cal_tool_active'
+    f = open(semaphore_file, 'w')
+    try:
+        main()
+    except rospy.ROSInterruptException:
+        pass
+    f.close()
+    os.remove(semaphore_file)

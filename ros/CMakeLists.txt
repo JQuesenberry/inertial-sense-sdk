@@ -6,6 +6,9 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
   std_msgs
+  std_msgs_stamped
+  mavros_msgs
+  gps_common
   sensor_msgs
   geometry_msgs
   diagnostic_msgs
@@ -34,24 +37,44 @@ add_message_files(
   DID_INS2.msg
   DID_INS1.msg
   DID_INS4.msg
+  DevInfo.msg
+  GenFaultCodes.msg
+  GPSStatus.msg
+  HdwStatusFlags.msg
+  INSStatusFlags.msg
+  GroundVehicle.msg
+  WheelConfig.msg
+  WheelTransform.msg
+  InfieldCal.msg
+  IMUs.msg
+  InfieldCalVAxis.msg
+  InfieldCalDirection.msg
+  IMUsAcc.msg
+  FlashConfig.msg
 )
 
 add_service_files(
   FILES
   FirmwareUpdate.srv
   refLLAUpdate.srv
+  SystemCommand.srv
+  GroundVehicleCommand.srv
+  InfieldCalCommand.srv
 )
 
 generate_messages(
   DEPENDENCIES
   std_msgs
+  std_msgs_stamped
+  mavros_msgs
+  gps_common
   geometry_msgs
 )
 
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES inertial_sense_ros
-  CATKIN_DEPENDS roscpp sensor_msgs geometry_msgs
+  CATKIN_DEPENDS roscpp sensor_msgs geometry_msgs mavros_msgs gps_common
 )
 
 # We don't need the example projects
@@ -90,3 +113,29 @@ target_link_libraries(test_ros_bridge ${PROJECT_NAME})
 
 # catkin_add_gtest(test_client_reconnect test/test_client_reconnect.cpp)
 # target_link_libraries(test_client_reconnect ${PROJECT_NAME})
+
+install(
+  TARGETS
+    InertialSense
+    inertial_sense_ros
+    inertial_sense_node
+  ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+  LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
+  RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)
+
+install(
+  FILES
+    LICENSE
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+)
+
+install(
+  DIRECTORY
+    launch
+  DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
+)
+
+catkin_install_python(PROGRAMS scripts/inertial_sense_calibration_tool
+  DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
+)

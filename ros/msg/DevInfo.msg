@@ -1,0 +1,10 @@
+string serialNumber
+string hardwareVer
+string firmwareVer
+string buildNumber
+string protocolVer
+string repoRevision
+string manufacturer
+string buildDate
+string buildTime
+string addInfo
