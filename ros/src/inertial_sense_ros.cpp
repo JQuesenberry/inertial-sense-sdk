@@ -447,11 +447,11 @@ void InertialSenseROS::load_params(YAML::Node &node)
 inertial_sense_ros::INSStatusFlags InertialSenseROS::process_ins_status(const uint32_t& ins_status)
 {
     inertial_sense_ros::INSStatusFlags status;
-    status.INS_STATUS_ATT_ALIGN_COARSE              = (bool)(ins_status & INS_STATUS_ATT_ALIGN_COARSE);
+    status.INS_STATUS_HDG_ALIGN_COARSE              = (bool)(ins_status & INS_STATUS_HDG_ALIGN_COARSE);
     status.INS_STATUS_VEL_ALIGN_COARSE              = (bool)(ins_status & INS_STATUS_VEL_ALIGN_COARSE);
     status.INS_STATUS_POS_ALIGN_COARSE              = (bool)(ins_status & INS_STATUS_POS_ALIGN_COARSE);
     status.INS_STATUS_WHEEL_AIDING_VEL              = (bool)(ins_status & INS_STATUS_WHEEL_AIDING_VEL);
-    status.INS_STATUS_ATT_ALIGN_FINE                = (bool)(ins_status & INS_STATUS_ATT_ALIGN_FINE);
+    status.INS_STATUS_HDG_ALIGN_FINE                = (bool)(ins_status & INS_STATUS_HDG_ALIGN_FINE);
     status.INS_STATUS_VEL_ALIGN_FINE                = (bool)(ins_status & INS_STATUS_VEL_ALIGN_FINE);
     status.INS_STATUS_POS_ALIGN_FINE                = (bool)(ins_status & INS_STATUS_POS_ALIGN_FINE);
     status.INS_STATUS_GPS_AIDING_HEADING            = (bool)(ins_status & INS_STATUS_GPS_AIDING_HEADING);
