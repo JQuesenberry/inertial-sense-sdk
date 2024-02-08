@@ -126,6 +126,12 @@ install(
 
 install(
   FILES
+    ../src/data_sets.h
+  DESTINATION ${CATKIN_PACKAGE_INCLUDE_DESTINATION}
+)
+
+install(
+  FILES
     LICENSE
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
 )
@@ -136,6 +142,8 @@ install(
   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
 )
 
-catkin_install_python(PROGRAMS scripts/inertial_sense_calibration_tool
+catkin_install_python(
+  PROGRAMS
+    scripts/inertial_sense_calibration_tool
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
