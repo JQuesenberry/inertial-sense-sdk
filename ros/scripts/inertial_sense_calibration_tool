@@ -9,11 +9,16 @@ from threading import Lock
 from functools import partial
 from inspect import currentframe, getframeinfo
 import re
+import argparse
 
 import rospy
 
 from inertial_sense_ros.msg import GroundVehicle, InfieldCal
 from inertial_sense_ros.srv import GroundVehicleCommand, InfieldCalCommand
+
+parser = argparse.ArgumentParser(prog='inertial_sense_calibration_tool')
+parser.add_argument('--allow-imu-zeroing', action='store_true', help='Allow IMU Zeroing')
+args = parser.parse_args()
 
 #log.write(f'@{getframeinfo(currentframe()).lineno}')
 
@@ -156,9 +161,9 @@ def cbGroundVehicle(msg):
         color = curses.color_pair(0)
         if 'LEARNING_CONVERGED' in status_str:
             color = curses.color_pair(2)
-        if 'LEARNING_ENABLED' in status_str:
+        elif 'LEARNING_ENABLED' in status_str:
             color = curses.color_pair(3)
-        if 'LEARNING_NEEDED' in status_str:
+        elif 'LEARNING_NEEDED' in status_str:
             color = curses.color_pair(4)
         ground_vehicle_status = (f'Ground Vehicle Status: {msg.status} ({status_str[:-2]})', color)
         updated = True
@@ -188,6 +193,8 @@ def change_menu_selected(key):
 def quit():
     raise Exception('Quit')
 
+is_avail = '' if args.allow_imu_zeroing else ' (UNAVAILABLE)'
+
 menus = {}
 menus['top-level'] = {
     'title': 'Main Menu',
@@ -201,13 +208,13 @@ menus['top-level-infield-cal'] = {
     'title': 'Infield Calibration Menu',
     'entries': [
         ('Off', partial(sendInfieldCalCommand, globals()['INFIELD_CAL_STATE_CMD_OFF'])),
-        ('Zero IMU', partial(sendInfieldCalCommand, globals()['INFIELD_CAL_STATE_CMD_INIT_ZERO_IMU'])),
-        ('Zero Gyro', partial(sendInfieldCalCommand, globals()['INFIELD_CAL_STATE_CMD_INIT_ZERO_GYRO'])),
-        ('Zero Accel', partial(sendInfieldCalCommand, globals()['INFIELD_CAL_STATE_CMD_INIT_ZERO_ACCEL'])),
+        ('Zero IMU' + is_avail, partial(sendInfieldCalCommand, globals()['INFIELD_CAL_STATE_CMD_INIT_ZERO_IMU']) if args.allow_imu_zeroing else None),
+        ('Zero Gyro' + is_avail, partial(sendInfieldCalCommand, globals()['INFIELD_CAL_STATE_CMD_INIT_ZERO_GYRO']) if args.allow_imu_zeroing else None),
+        ('Zero Accel' + is_avail, partial(sendInfieldCalCommand, globals()['INFIELD_CAL_STATE_CMD_INIT_ZERO_ACCEL']) if args.allow_imu_zeroing else None),
         ('Zero Attitude', partial(sendInfieldCalCommand, globals()['INFIELD_CAL_STATE_CMD_INIT_ZERO_ATTITUDE'])),
-        ('Zero Attitude & IMU', partial(sendInfieldCalCommand, globals()['INFIELD_CAL_STATE_CMD_INIT_ZERO_ATTITUDE_IMU'])),
-        ('Zero Attitude & Gyro', partial(sendInfieldCalCommand, globals()['INFIELD_CAL_STATE_CMD_INIT_ZERO_ATTITUDE_GYRO'])),
-        ('Zero Attitude & Accel', partial(sendInfieldCalCommand, globals()['INFIELD_CAL_STATE_CMD_INIT_ZERO_ATTITUDE_ACCEL'])),
+        ('Zero Attitude & IMU' + is_avail, partial(sendInfieldCalCommand, globals()['INFIELD_CAL_STATE_CMD_INIT_ZERO_ATTITUDE_IMU']) if args.allow_imu_zeroing else None),
+        ('Zero Attitude & Gyro' + is_avail, partial(sendInfieldCalCommand, globals()['INFIELD_CAL_STATE_CMD_INIT_ZERO_ATTITUDE_GYRO']) if args.allow_imu_zeroing else None),
+        ('Zero Attitude & Accel' + is_avail, partial(sendInfieldCalCommand, globals()['INFIELD_CAL_STATE_CMD_INIT_ZERO_ATTITUDE_ACCEL']) if args.allow_imu_zeroing else None),
         ('Start Sampling for 5 Seconds', partial(sendInfieldCalCommand, globals()['INFIELD_CAL_STATE_CMD_START_SAMPLE'])),
         ('Save & Finish', partial(sendInfieldCalCommand, globals()['INFIELD_CAL_STATE_CMD_SAVE_AND_FINISH'])),
         ('Toggle Motion Detect', toggle_infield_cal_disable_motion_detect),
