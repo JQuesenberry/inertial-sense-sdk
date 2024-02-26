@@ -101,8 +101,8 @@ void InertialSenseROS::initializeIS(bool configFlashParameters) {
         firmware_compatiblity_check();
 
         IS_.StopBroadcasts(true);
-        configure_data_streams(true);
         configure_rtk();
+        configure_data_streams(true);
         IS_.SavePersistent();
 
         sleep(1);
