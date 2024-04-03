@@ -1208,7 +1208,7 @@ void InertialSenseROS::INS1_callback(eDataIDs DID, const ins_1_t *const msg)
                 float varX = msg_odom_ned.pose.covariance[0];
                 float varY = msg_odom_ned.pose.covariance[7];
                 float varZ = msg_odom_ned.pose.covariance[14];
-                msg_GpsFix_Fused.err_horz = sqrt(sqrt(pow(varX, 2.0) + pow(varY, 2.0)));
+                msg_GpsFix_Fused.err_horz = sqrt(varX + varY);
                 msg_GpsFix_Fused.err_vert = sqrt(varZ);
                 msg_GpsFix_Fused.position_covariance[0] = varX;
                 msg_GpsFix_Fused.position_covariance[4] = varY;
@@ -1866,7 +1866,7 @@ void InertialSenseROS::GPS_pos_callback(eDataIDs DID, const gps_pos_t *const msg
             msg_GpsFix.vdop = 0; // TODO
             msg_GpsFix.tdop = 0; // TODO
             msg_GpsFix.err = 0; // TODO
-            msg_GpsFix.err_horz = msg->hAcc;
+            msg_GpsFix.err_horz = msg->hAcc * 2.0;
             msg_GpsFix.err_vert = msg->vAcc;
             msg_GpsFix.err_track = 0; // TODO
             msg_GpsFix.err_speed = 0; // TODO
