@@ -1143,6 +1143,25 @@ void InertialSenseROS::INS1_callback(eDataIDs DID, const ins_1_t *const msg)
             msg_NavSatFix_Fused.latitude = msg->lla[0];
             msg_NavSatFix_Fused.longitude = msg->lla[1];
             msg_NavSatFix_Fused.altitude = msg->lla[2];
+            for(size_t i=0; i<msg_NavSatFix_Fused.position_covariance.size(); i++)
+                msg_NavSatFix_Fused.position_covariance[i] = 0;
+            if (covariance_enabled_)
+            {
+                float varX = msg_odom_ned.pose.covariance[0];
+                float varY = msg_odom_ned.pose.covariance[7];
+                float varZ = msg_odom_ned.pose.covariance[14];
+                msg_NavSatFix_Fused.position_covariance[0] = varX;
+                msg_NavSatFix_Fused.position_covariance[4] = varY;
+                msg_NavSatFix_Fused.position_covariance[8] = varZ;
+                msg_NavSatFix_Fused.position_covariance_type = COVARIANCE_TYPE_DIAGONAL_KNOWN;
+            }
+            else
+            {
+                msg_NavSatFix_Fused.position_covariance[0] = 1;
+                msg_NavSatFix_Fused.position_covariance[4] = 1;
+                msg_NavSatFix_Fused.position_covariance[8] = 1;
+                msg_NavSatFix_Fused.position_covariance_type = COVARIANCE_TYPE_UNKNOWN;
+            }
             rs_.gps1_navsatfix_fused.pub.publish(msg_NavSatFix_Fused);
         }
 
@@ -1165,7 +1184,44 @@ void InertialSenseROS::INS1_callback(eDataIDs DID, const ins_1_t *const msg)
             msg_GpsFix_Fused.climb = msg->uvw[2];
             msg_GpsFix_Fused.pitch = msg->theta[1] * 180.0 / M_PI;
             msg_GpsFix_Fused.roll = msg->theta[0] * 180.0 / M_PI;
+            msg_GpsFix_Fused.dip = 0; // TODO
             msg_GpsFix_Fused.time = msg->week * 604800.0 + msg->timeOfWeek;
+            msg_GpsFix_Fused.gdop = 0; // TODO
+            msg_GpsFix_Fused.pdop = 0; // TODO
+            msg_GpsFix_Fused.hdop = 0; // TODO
+            msg_GpsFix_Fused.vdop = 0; // TODO
+            msg_GpsFix_Fused.tdop = 0; // TODO
+            msg_GpsFix_Fused.err = 0; // TODO
+            msg_GpsFix_Fused.err_horz = 0; // TODO
+            msg_GpsFix_Fused.err_vert = 0; // TODO
+            msg_GpsFix_Fused.err_track = 0; // TODO
+            msg_GpsFix_Fused.err_speed = 0; // TODO
+            msg_GpsFix_Fused.err_climb = 0; // TODO
+            msg_GpsFix_Fused.err_time = 0; // TODO
+            msg_GpsFix_Fused.err_pitch = 0; // TODO
+            msg_GpsFix_Fused.err_roll = 0; // TODO
+            msg_GpsFix_Fused.err_dip = 0; // TODO
+            for(size_t i=0; i<msg_GpsFix_Fused.position_covariance.size(); i++)
+                msg_GpsFix_Fused.position_covariance[i] = 0;
+            if (covariance_enabled_)
+            {
+                float varX = msg_odom_ned.pose.covariance[0];
+                float varY = msg_odom_ned.pose.covariance[7];
+                float varZ = msg_odom_ned.pose.covariance[14];
+                msg_GpsFix_Fused.err_horz = sqrt(sqrt(pow(varX, 2.0) + pow(varY, 2.0)));
+                msg_GpsFix_Fused.err_vert = sqrt(varZ);
+                msg_GpsFix_Fused.position_covariance[0] = varX;
+                msg_GpsFix_Fused.position_covariance[4] = varY;
+                msg_GpsFix_Fused.position_covariance[8] = varZ;
+                msg_GpsFix_Fused.position_covariance_type = gps_common::GPSFix::COVARIANCE_TYPE_DIAGONAL_KNOWN;
+            }
+            else
+            {
+                msg_GpsFix_Fused.position_covariance[0] = 1;
+                msg_GpsFix_Fused.position_covariance[4] = 1;
+                msg_GpsFix_Fused.position_covariance[8] = 1;
+                msg_GpsFix_Fused.position_covariance_type = gps_common::GPSFix::COVARIANCE_TYPE_UNKNOWN;
+            }
             rs_.gps1_gpsfix_fused.pub.publish(msg_GpsFix_Fused);
         }
 
@@ -1729,6 +1785,9 @@ void InertialSenseROS::GPS_pos_callback(eDataIDs DID, const gps_pos_t *const msg
             ref_lla_set_current_on_start_ = false;
         }
 
+        const double varH = pow(msg->hAcc, 2);
+        const double varV = pow(msg->vAcc, 2);
+
         if (rs_.gps1_navsatfix.enabled)
         {
             msg_NavSatFix.header.stamp = ros_time_from_week_and_tow(msg->week, msg->timeOfWeekMs / 1.0e3);
@@ -1756,8 +1815,6 @@ void InertialSenseROS::GPS_pos_callback(eDataIDs DID, const gps_pos_t *const msg
             msg_NavSatFix.altitude = msg->lla[2];
 
             // Diagonal Known
-            const double varH = pow(msg->hAcc / 1000.0, 2);
-            const double varV = pow(msg->vAcc / 1000.0, 2);
             msg_NavSatFix.position_covariance[0] = varH;
             msg_NavSatFix.position_covariance[4] = varH;
             msg_NavSatFix.position_covariance[8] = varV;
@@ -1809,8 +1866,8 @@ void InertialSenseROS::GPS_pos_callback(eDataIDs DID, const gps_pos_t *const msg
             msg_GpsFix.vdop = 0; // TODO
             msg_GpsFix.tdop = 0; // TODO
             msg_GpsFix.err = 0; // TODO
-            msg_GpsFix.err_horz = 0; // TODO
-            msg_GpsFix.err_vert = 0; // TODO
+            msg_GpsFix.err_horz = msg->hAcc;
+            msg_GpsFix.err_vert = msg->vAcc;
             msg_GpsFix.err_track = 0; // TODO
             msg_GpsFix.err_speed = 0; // TODO
             msg_GpsFix.err_climb = 0; // TODO
@@ -1818,8 +1875,11 @@ void InertialSenseROS::GPS_pos_callback(eDataIDs DID, const gps_pos_t *const msg
             msg_GpsFix.err_pitch = 0; // TODO
             msg_GpsFix.err_roll = 0; // TODO
             msg_GpsFix.err_dip = 0; // TODO
-            msg_GpsFix.position_covariance; // TODO
-            msg_GpsFix.position_covariance_type = gps_common::GPSFix::COVARIANCE_TYPE_UNKNOWN; // TODO
+            // Diagonal Known
+            msg_GpsFix.position_covariance[0] = varH;
+            msg_GpsFix.position_covariance[4] = varH;
+            msg_GpsFix.position_covariance[8] = varV;
+            msg_GpsFix.position_covariance_type = gps_common::GPSFix::COVARIANCE_TYPE_DIAGONAL_KNOWN; // TODO
             rs_.gps1_gpsfix.pub.publish(msg_GpsFix);
         }
     }
@@ -1843,6 +1903,7 @@ void InertialSenseROS::GPS_vel_callback(eDataIDs DID, const gps_vel_t *const msg
             {
                 msg_GpsFix.speed = sqrt(pow(msg->vel[0], 2.0) + pow(msg->vel[1], 2.0) + pow(msg->vel[2], 2.0));
                 msg_GpsFix.climb = msg->vel[2];
+                msg_GpsFix.err_speed = msg->sAcc;
             }
         }
         break;
