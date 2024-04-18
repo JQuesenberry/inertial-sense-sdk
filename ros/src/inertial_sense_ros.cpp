@@ -156,6 +156,7 @@ void InertialSenseROS::initializeROS() {
 
     if (rs_.gps2.enabled)                   { rs_.gps2.pub = nh_.advertise<inertial_sense_ros::GPS>(rs_.gps2.topic, 1); }
     if (rs_.gps2_navsatfix.enabled)         { rs_.gps2_navsatfix.pub = nh_.advertise<sensor_msgs::NavSatFix>(rs_.gps2_navsatfix.topic, 1); }
+    if (rs_.gps2_gpsfix.enabled)            { rs_.gps2_gpsfix.pub = nh_.advertise<gps_common::GPSFix>(rs_.gps2_gpsfix.topic, 1); }
     if (rs_.gps2_info.enabled)              { rs_.gps2_info.pub = nh_.advertise<inertial_sense_ros::GPSInfo>(rs_.gps2_info.topic, 1); }
 
     if (rs_.dev_info.enabled) {
@@ -368,6 +369,7 @@ void InertialSenseROS::load_params(YAML::Node &node)
     ph.msgParams(rs_.gps2_info, "info", "gps2/info");
     ph.msgParams(rs_.gps2_raw, "raw", "gps2/raw");
     ph.msgParams(rs_.gps2_navsatfix, "navsatfix", "gps2/NavSatFix");
+    ph.msgParams(rs_.gps2_gpsfix, "gpsfix", "gps2/GpsFix");
     ph.msgParams(rs_.gps2_status, "status", "gps2/status");
     gps2Node["messages"] = gps2Msgs;
     node["gps2"] = gps2Node;
@@ -621,16 +623,16 @@ void InertialSenseROS::configure_data_streams(bool firstrun) // if firstrun is t
             uint16_t gnssSatSigConst = flashCfg.gnssSatSigConst;
 
             if (gnssSatSigConst & GNSS_SAT_SIG_CONST_GPS) {
-                msg_NavSatFix.status.service |= NavSatFixService::SERVICE_GPS;
+                msg_NavSatFix2.status.service |= NavSatFixService::SERVICE_GPS;
             }
             if (gnssSatSigConst & GNSS_SAT_SIG_CONST_GLO) {
-                msg_NavSatFix.status.service |= NavSatFixService::SERVICE_GLONASS;
+                msg_NavSatFix2.status.service |= NavSatFixService::SERVICE_GLONASS;
             }
             if (gnssSatSigConst & GNSS_SAT_SIG_CONST_BDS) {
-                msg_NavSatFix.status.service |= NavSatFixService::SERVICE_COMPASS; // includes BeiDou.
+                msg_NavSatFix2.status.service |= NavSatFixService::SERVICE_COMPASS; // includes BeiDou.
             }
             if (gnssSatSigConst & GNSS_SAT_SIG_CONST_GAL) {
-                msg_NavSatFix.status.service |= NavSatFixService::SERVICE_GALILEO;
+                msg_NavSatFix2.status.service |= NavSatFixService::SERVICE_GALILEO;
             }
         }
         NavSatFixConfigured = true;
@@ -1143,11 +1145,34 @@ void InertialSenseROS::INS1_callback(eDataIDs DID, const ins_1_t *const msg)
             msg_NavSatFix_Fused.latitude = msg->lla[0];
             msg_NavSatFix_Fused.longitude = msg->lla[1];
             msg_NavSatFix_Fused.altitude = msg->lla[2];
+            for(size_t i=0; i<msg_NavSatFix_Fused.position_covariance.size(); i++)
+                msg_NavSatFix_Fused.position_covariance[i] = 0;
+            if (covariance_enabled_)
+            {
+                float varX = msg_odom_ned.pose.covariance[0];
+                float varY = msg_odom_ned.pose.covariance[7];
+                float varZ = msg_odom_ned.pose.covariance[14];
+                msg_NavSatFix_Fused.position_covariance[0] = varX;
+                msg_NavSatFix_Fused.position_covariance[4] = varY;
+                msg_NavSatFix_Fused.position_covariance[8] = varZ;
+                msg_NavSatFix_Fused.position_covariance_type = COVARIANCE_TYPE_DIAGONAL_KNOWN;
+            }
+            else
+            {
+                msg_NavSatFix_Fused.position_covariance[0] = 1;
+                msg_NavSatFix_Fused.position_covariance[4] = 1;
+                msg_NavSatFix_Fused.position_covariance[8] = 1;
+                msg_NavSatFix_Fused.position_covariance_type = COVARIANCE_TYPE_UNKNOWN;
+            }
             rs_.gps1_navsatfix_fused.pub.publish(msg_NavSatFix_Fused);
         }
 
         if (rs_.gps1_gpsfix.enabled) {
             msg_GpsFix.track = track_ground;
+        }
+
+        if (rs_.gps2_gpsfix.enabled) {
+            msg_GpsFix2.track = track_ground;
         }
 
         if (rs_.gps1_gpsfix_fused.enabled) {
@@ -1165,7 +1190,45 @@ void InertialSenseROS::INS1_callback(eDataIDs DID, const ins_1_t *const msg)
             msg_GpsFix_Fused.climb = msg->uvw[2];
             msg_GpsFix_Fused.pitch = msg->theta[1] * 180.0 / M_PI;
             msg_GpsFix_Fused.roll = msg->theta[0] * 180.0 / M_PI;
+            msg_GpsFix_Fused.dip = 0; // TODO
             msg_GpsFix_Fused.time = msg->week * 604800.0 + msg->timeOfWeek;
+            msg_GpsFix_Fused.gdop = 0; // TODO
+            msg_GpsFix_Fused.pdop = 0; // TODO
+            msg_GpsFix_Fused.hdop = 0; // TODO
+            msg_GpsFix_Fused.vdop = 0; // TODO
+            msg_GpsFix_Fused.tdop = 0; // TODO
+            msg_GpsFix_Fused.err = 0; // TODO
+            msg_GpsFix_Fused.err_horz = 0; // TODO
+            msg_GpsFix_Fused.err_vert = 0; // TODO
+            msg_GpsFix_Fused.err_track = 0; // TODO
+            msg_GpsFix_Fused.err_speed = 0; // TODO
+            msg_GpsFix_Fused.err_climb = 0; // TODO
+            msg_GpsFix_Fused.err_time = 0; // TODO
+            msg_GpsFix_Fused.err_pitch = 0; // TODO
+            msg_GpsFix_Fused.err_roll = 0; // TODO
+            msg_GpsFix_Fused.err_dip = 0; // TODO
+            for(size_t i=0; i<msg_GpsFix_Fused.position_covariance.size(); i++)
+                msg_GpsFix_Fused.position_covariance[i] = 0;
+            if (covariance_enabled_)
+            {
+                float varX = msg_odom_ned.pose.covariance[0];
+                float varY = msg_odom_ned.pose.covariance[7];
+                float varZ = msg_odom_ned.pose.covariance[14];
+                // GPSFix Expects Error Values to be 95% Confidence
+                msg_GpsFix_Fused.err_horz = sqrt(varX + varY) * 2.0;
+                msg_GpsFix_Fused.err_vert = sqrt(varZ) * 2.0;
+                msg_GpsFix_Fused.position_covariance[0] = varX;
+                msg_GpsFix_Fused.position_covariance[4] = varY;
+                msg_GpsFix_Fused.position_covariance[8] = varZ;
+                msg_GpsFix_Fused.position_covariance_type = gps_common::GPSFix::COVARIANCE_TYPE_DIAGONAL_KNOWN;
+            }
+            else
+            {
+                msg_GpsFix_Fused.position_covariance[0] = 1;
+                msg_GpsFix_Fused.position_covariance[4] = 1;
+                msg_GpsFix_Fused.position_covariance[8] = 1;
+                msg_GpsFix_Fused.position_covariance_type = gps_common::GPSFix::COVARIANCE_TYPE_UNKNOWN;
+            }
             rs_.gps1_gpsfix_fused.pub.publish(msg_GpsFix_Fused);
         }
 
@@ -1686,6 +1749,125 @@ void InertialSenseROS::GPS_pos_callback(eDataIDs DID, const gps_pos_t *const msg
         break;
     }
 
+    const double varH = pow(msg->hAcc, 2);
+    const double varV = pow(msg->vAcc, 2);
+
+    auto set_navsatfix = [&](TopicHelper& th, sensor_msgs::NavSatFix& navsatfix)
+    {
+        if (th.enabled)
+        {
+            navsatfix.header.stamp = ros_time_from_week_and_tow(msg->week, msg->timeOfWeekMs / 1.0e3);
+            navsatfix.header.frame_id = frame_id_;
+            navsatfix.status.status = -1;                           // Assume no Fix
+            if ((msg->status & GPS_STATUS_FIX_MASK) >= GPS_STATUS_FIX_2D) // Check for fix and set
+            {
+                navsatfix.status.status = NavSatFixStatusFixType::STATUS_FIX;
+            }
+
+            if ((msg->status & GPS_STATUS_FIX_MASK) == GPS_STATUS_FIX_SBAS) // Check for SBAS only fix
+            {
+                navsatfix.status.status = NavSatFixStatusFixType::STATUS_SBAS_FIX;
+            }
+
+            if (((msg->status & GPS_STATUS_FIX_MASK) == GPS_STATUS_FIX_DGPS) ||
+                ((msg->status & GPS_STATUS_FIX_MASK) >= GPS_STATUS_FIX_RTK_SINGLE)) // Check for any RTK fix
+            {
+                navsatfix.status.status = NavSatFixStatusFixType::STATUS_GBAS_FIX;
+            }
+
+            // navsatfix.status.service - Service set at Node Startup
+            navsatfix.latitude = msg->lla[0];
+            navsatfix.longitude = msg->lla[1];
+            navsatfix.altitude = msg->lla[2];
+
+            // Diagonal Known
+            navsatfix.position_covariance[0] = varH;
+            navsatfix.position_covariance[4] = varH;
+            navsatfix.position_covariance[8] = varV;
+            navsatfix.position_covariance_type = COVARIANCE_TYPE_DIAGONAL_KNOWN;
+
+            th.pub.publish(navsatfix);
+        }
+    };
+
+    auto set_gpsfix = [&](TopicHelper& th, gps_common::GPSFix& gpsfix)
+    {
+        if (th.enabled)
+        {
+            gpsfix.header.stamp = ros_time_from_week_and_tow(msg->week, msg->timeOfWeekMs / 1.0e3);
+            gpsfix.status.position_source = gps_common::GPSStatus::SOURCE_GPS;
+            gpsfix.status.orientation_source = gps_common::GPSStatus::SOURCE_NONE;
+            gpsfix.status.motion_source = gps_common::GPSStatus::SOURCE_GPS;
+            gpsfix.status.satellites_used = (uint8_t)(msg->status & GPS_STATUS_NUM_SATS_USED_MASK);
+            gpsfix.status.status = gps_common::GPSStatus::STATUS_NO_FIX;
+            if ((msg->status & GPS_STATUS_FIX_MASK) >= GPS_STATUS_FIX_2D) // Check for fix and set
+            {
+                gpsfix.status.status = gps_common::GPSStatus::STATUS_FIX;
+            }
+
+            if ((msg->status & GPS_STATUS_FIX_MASK) == GPS_STATUS_FIX_SBAS) // Check for SBAS only fix
+            {
+                gpsfix.status.status = gps_common::GPSStatus::STATUS_SBAS_FIX;
+            }
+
+            if ((msg->status & GPS_STATUS_FIX_MASK) >= GPS_STATUS_FIX_RTK_SINGLE) // Check for any RTK fix
+            {
+                gpsfix.status.status = gps_common::GPSStatus::STATUS_GBAS_FIX;
+            }
+
+            if ((msg->status & GPS_STATUS_FIX_MASK) == GPS_STATUS_FIX_DGPS) // Check for DGPS fix
+            {
+                gpsfix.status.status = gps_common::GPSStatus::STATUS_DGPS_FIX;
+            }
+
+            gpsfix.latitude = msg->lla[0];
+            gpsfix.longitude = msg->lla[1];
+            gpsfix.altitude = msg->hMSL; // need altitude in MSL, not above ellipsoid
+            //gpsfix.track = 0; // See INS1_callback
+            //gpsfix.speed = 0; // See GPS_vel_callback
+            //gpsfix.climb = 0; // See GPS_vel_callback
+            gpsfix.pitch;
+            gpsfix.roll;
+            gpsfix.dip = 0; // TODO
+            gpsfix.time = msg->week * 604800.0 + msg->timeOfWeekMs / 1000.0;
+            gpsfix.gdop = 0; // TODO
+            gpsfix.pdop = msg->pDop;
+            gpsfix.hdop = 0; // TODO
+            gpsfix.vdop = 0; // TODO
+            gpsfix.tdop = 0; // TODO
+            gpsfix.err = 0; // TODO
+            // GPSFix Expects Error Values to be 95% Confidence
+            gpsfix.err_horz = msg->hAcc * 2.0;
+            gpsfix.err_vert = msg->vAcc * 2.0;
+            gpsfix.err_track = 0; // TODO
+            gpsfix.err_speed = 0; // TODO
+            gpsfix.err_climb = 0; // TODO
+            gpsfix.err_time = 0; // TODO
+            gpsfix.err_pitch = 0; // TODO
+            gpsfix.err_roll = 0; // TODO
+            gpsfix.err_dip = 0; // TODO
+            // Diagonal Known
+            gpsfix.position_covariance[0] = varH;
+            gpsfix.position_covariance[4] = varH;
+            gpsfix.position_covariance[8] = varV;
+            gpsfix.position_covariance_type = gps_common::GPSFix::COVARIANCE_TYPE_DIAGONAL_KNOWN; // TODO
+
+            th.pub.publish(gpsfix);
+        }
+    };
+
+    if(DID == DID_GPS1_POS)
+    {
+        set_navsatfix(rs_.gps1_navsatfix, msg_NavSatFix);
+        set_gpsfix(rs_.gps1_gpsfix, msg_GpsFix);
+    }
+
+    if(DID == DID_GPS2_POS)
+    {
+        set_navsatfix(rs_.gps2_navsatfix, msg_NavSatFix2);
+        set_gpsfix(rs_.gps2_gpsfix, msg_GpsFix2);
+    }
+
     if (primaryGpsDid == DID)
     {
         GPS_week_ = msg->week;
@@ -1728,100 +1910,6 @@ void InertialSenseROS::GPS_pos_callback(eDataIDs DID, const gps_pos_t *const msg
             set_current_position_as_refLLA(req, res);
             ref_lla_set_current_on_start_ = false;
         }
-
-        if (rs_.gps1_navsatfix.enabled)
-        {
-            msg_NavSatFix.header.stamp = ros_time_from_week_and_tow(msg->week, msg->timeOfWeekMs / 1.0e3);
-            msg_NavSatFix.header.frame_id = frame_id_;
-            msg_NavSatFix.status.status = -1;                           // Assume no Fix
-            if ((msg->status & GPS_STATUS_FIX_MASK) >= GPS_STATUS_FIX_2D) // Check for fix and set
-            {
-                msg_NavSatFix.status.status = NavSatFixStatusFixType::STATUS_FIX;
-            }
-
-            if ((msg->status & GPS_STATUS_FIX_MASK) == GPS_STATUS_FIX_SBAS) // Check for SBAS only fix
-            {
-                msg_NavSatFix.status.status = NavSatFixStatusFixType::STATUS_SBAS_FIX;
-            }
-
-            if (((msg->status & GPS_STATUS_FIX_MASK) == GPS_STATUS_FIX_DGPS) ||
-                ((msg->status & GPS_STATUS_FIX_MASK) >= GPS_STATUS_FIX_RTK_SINGLE)) // Check for any RTK fix
-            {
-                msg_NavSatFix.status.status = NavSatFixStatusFixType::STATUS_GBAS_FIX;
-            }
-
-            // msg_NavSatFix.status.service - Service set at Node Startup
-            msg_NavSatFix.latitude = msg->lla[0];
-            msg_NavSatFix.longitude = msg->lla[1];
-            msg_NavSatFix.altitude = msg->lla[2];
-
-            // Diagonal Known
-            const double varH = pow(msg->hAcc / 1000.0, 2);
-            const double varV = pow(msg->vAcc / 1000.0, 2);
-            msg_NavSatFix.position_covariance[0] = varH;
-            msg_NavSatFix.position_covariance[4] = varH;
-            msg_NavSatFix.position_covariance[8] = varV;
-            msg_NavSatFix.position_covariance_type = COVARIANCE_TYPE_DIAGONAL_KNOWN;
-            rs_.gps1_navsatfix.pub.publish(msg_NavSatFix);
-        }
-
-        if (rs_.gps1_gpsfix.enabled)
-        {
-            msg_GpsFix.header.stamp = ros_time_from_week_and_tow(msg->week, msg->timeOfWeekMs / 1.0e3);
-            msg_GpsFix.status.position_source = gps_common::GPSStatus::SOURCE_GPS;
-            msg_GpsFix.status.orientation_source = gps_common::GPSStatus::SOURCE_NONE;
-            msg_GpsFix.status.motion_source = gps_common::GPSStatus::SOURCE_GPS;
-            msg_GpsFix.status.satellites_used = (uint8_t)(msg->status & GPS_STATUS_NUM_SATS_USED_MASK);
-            msg_GpsFix.status.status = gps_common::GPSStatus::STATUS_NO_FIX;
-            if ((msg->status & GPS_STATUS_FIX_MASK) >= GPS_STATUS_FIX_2D) // Check for fix and set
-            {
-                msg_GpsFix.status.status = gps_common::GPSStatus::STATUS_FIX;
-            }
-
-            if ((msg->status & GPS_STATUS_FIX_MASK) == GPS_STATUS_FIX_SBAS) // Check for SBAS only fix
-            {
-                msg_GpsFix.status.status = gps_common::GPSStatus::STATUS_SBAS_FIX;
-            }
-
-            if ((msg->status & GPS_STATUS_FIX_MASK) >= GPS_STATUS_FIX_RTK_SINGLE) // Check for any RTK fix
-            {
-                msg_GpsFix.status.status = gps_common::GPSStatus::STATUS_GBAS_FIX;
-            }
-
-            if ((msg->status & GPS_STATUS_FIX_MASK) == GPS_STATUS_FIX_DGPS) // Check for DGPS fix
-            {
-                msg_GpsFix.status.status = gps_common::GPSStatus::STATUS_DGPS_FIX;
-            }
-
-            msg_GpsFix.latitude = msg->lla[0];
-            msg_GpsFix.longitude = msg->lla[1];
-            msg_GpsFix.altitude = msg->hMSL; // need altitude in MSL, not above ellipsoid
-            //msg_GpsFix.track = 0; // See INS1_callback
-            //msg_GpsFix.speed = 0; // See GPS_vel_callback
-            //msg_GpsFix.climb = 0; // See GPS_vel_callback
-            msg_GpsFix.pitch;
-            msg_GpsFix.roll;
-            msg_GpsFix.dip = 0; // TODO
-            msg_GpsFix.time = msg->week * 604800.0 + msg->timeOfWeekMs / 1000.0;
-            msg_GpsFix.gdop = 0; // TODO
-            msg_GpsFix.pdop = msg->pDop;
-            msg_GpsFix.hdop = 0; // TODO
-            msg_GpsFix.vdop = 0; // TODO
-            msg_GpsFix.tdop = 0; // TODO
-            msg_GpsFix.err = 0; // TODO
-            msg_GpsFix.err_horz = 0; // TODO
-            msg_GpsFix.err_vert = 0; // TODO
-            msg_GpsFix.err_track = 0; // TODO
-            msg_GpsFix.err_speed = 0; // TODO
-            msg_GpsFix.err_climb = 0; // TODO
-            msg_GpsFix.err_time = 0; // TODO
-            msg_GpsFix.err_pitch = 0; // TODO
-            msg_GpsFix.err_roll = 0; // TODO
-            msg_GpsFix.err_dip = 0; // TODO
-            msg_GpsFix.position_covariance; // TODO
-            msg_GpsFix.position_covariance_type = gps_common::GPSFix::COVARIANCE_TYPE_UNKNOWN; // TODO
-            rs_.gps1_gpsfix.pub.publish(msg_GpsFix);
-        }
     }
 }
 
@@ -1843,6 +1931,7 @@ void InertialSenseROS::GPS_vel_callback(eDataIDs DID, const gps_vel_t *const msg
             {
                 msg_GpsFix.speed = sqrt(pow(msg->vel[0], 2.0) + pow(msg->vel[1], 2.0) + pow(msg->vel[2], 2.0));
                 msg_GpsFix.climb = msg->vel[2];
+                msg_GpsFix.err_speed = msg->sAcc;
             }
         }
         break;
@@ -1857,6 +1946,12 @@ void InertialSenseROS::GPS_vel_callback(eDataIDs DID, const gps_vel_t *const msg
             gps2_velEcef.vector.y = msg->vel[1];
             gps2_velEcef.vector.z = msg->vel[2];
             publishGPS2();
+            if (rs_.gps2_gpsfix.enabled)
+            {
+                msg_GpsFix2.speed = sqrt(pow(msg->vel[0], 2.0) + pow(msg->vel[1], 2.0) + pow(msg->vel[2], 2.0));
+                msg_GpsFix2.climb = msg->vel[2];
+                msg_GpsFix2.err_speed = msg->sAcc;
+            }
         }
         break;
     }
