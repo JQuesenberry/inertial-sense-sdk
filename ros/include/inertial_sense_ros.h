@@ -266,6 +266,7 @@ public:
         TopicHelper gps1_gpsfix;
         TopicHelper gps1_gpsfix_fused;
         TopicHelper gps2_navsatfix;
+        TopicHelper gps2_gpsfix;
         TopicHelper gps1_status;
         TopicHelper gps2_status;
         TopicHelper gps1_info;
@@ -447,8 +448,10 @@ public:
     inertial_sense_ros::GPS msg_gps2;
     sensor_msgs::NavSatFix msg_NavSatFix;
     sensor_msgs::NavSatFix msg_NavSatFix_Fused;
+    sensor_msgs::NavSatFix msg_NavSatFix2;
     gps_common::GPSFix msg_GpsFix;
     gps_common::GPSFix msg_GpsFix_Fused;
+    gps_common::GPSFix msg_GpsFix2;
     gps_pos_t gps1_pos;
     gps_pos_t gps2_pos;
     gps_vel_t gps1_vel;
